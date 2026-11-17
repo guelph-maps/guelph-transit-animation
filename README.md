@@ -72,7 +72,37 @@ Route classes come from the route number (80s and 90s high-frequency, 50s univer
 the rest base), which gives the 10 / 17 / 6 split the city describes when 12A and 12B
 count as one route.
 
-SHAPES_SECTION
+## Route shapes
+
+Remix does not publish line geometry, so `tools/route_shapes.py` routes each of the 68
+directions through its stops on OpenStreetMap roads (the public OSRM server, kerb-side
+approaches; Valhalla's bus profile for legs a car cannot drive, such as the Guelph Central
+Station and University Centre platforms) and checks every leg against the distance Remix
+gives between the two stops. Raw responses are cached under `source/`, so a rerun makes
+no requests.
+
+Result: 1,196 legs, of which 10 fell back to a straight segment and 28 keep a routed line
+that is outside tolerance (the larger of 60 m and 25%). Every stop is within 40 m of its
+line. The full list is in `source/derived/shapes_report.txt`.
+
+Known weak spots:
+
+- **Downtown around Wyndham Street and Guelph Central Station**: six of the ten straight
+  segments are here; every router detours.
+- **Woodlawn Smart Centres and Stone Road Mall**: Remix's first legs are about twice the
+  routed length, so its shape probably loops through the plaza and ours does not.
+- **Six directions are more than 8% off Remix's total length**: 13 eastbound (-19%),
+  80 inbound (-19%), 12A northbound (-13%), 9 northbound (+11%), 92A southbound (-11%),
+  3 southbound (-10%). In each, one or two Remix distances are far longer than any route
+  between the stops, which the routed line cannot reproduce.
+- **Stop order was repaired in 11 directions** (30 stops, most on routes 9 and 11). There
+  Remix's distances for recently added stops are on a different scale from the older
+  ones, so sorting by distance interleaves them wrongly. The builder keeps the longest
+  consistent chain of stops, routes through those, and places the rest by position along
+  the line. Route 9 northbound still doubles back once near Waterloo at Glasgow.
+
+Buses are placed by Remix distance mapped onto the line through the stops, so a shape
+that is a little long or short still has the bus at each stop at the right time.
 
 ## Checks
 
@@ -82,6 +112,8 @@ Run in the browser console (`window.sim` exposes the simulation):
   `round-trip time ÷ headway` buses out.
 - Weekday 34 routes run; Saturday and Sunday 27, the missing seven being 50–55 and 92A.
 - Peak buses out: 85 weekday, 67 Saturday, 67 Sunday. Nothing is out at 4:50 am.
+- The routed lines were drawn to an image and compared by eye with the city's
+  high-frequency PDF map.
 
 ## Before publishing
 

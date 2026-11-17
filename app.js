@@ -305,7 +305,7 @@
           attributionControl: { compact: false },
         });
         map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-        map.on('load', resolve);
+        map.once('style.load', resolve);  // do not wait for basemap tiles
         map.on('error', e => console.error('map error:', e.error && e.error.message));
       }),
     ]);

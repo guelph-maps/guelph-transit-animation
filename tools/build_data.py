@@ -63,20 +63,29 @@ def main():
             ds = sorted(direction["directionStops"], key=lambda s: s["distanceFromStart"])
             if len(ds) < 2:
                 sys.exit(f"{short}/{di}: fewer than two stops")
-            coords = [stops_by_id[s["placeId"]]["geometry"]["coordinates"] for s in ds]
-            # d: metres along Remix's own (unpublished) shape, rebased so the first stop is 0.
-            d = [round(s["distanceFromStart"] - ds[0]["distanceFromStart"], 1) for s in ds]
-
             shape = shapes.get(f"{short}/{di}")
-            if shape and len(shape["stopM"]) == len(ds):
+            if shape:
+                # The shape builder also repairs the stop order: in a few directions
+                # Remix's distances for recently added stops are on a different scale,
+                # so sorting by distance alone interleaves them wrongly.
+                if sorted(shape["order"]) != list(range(len(ds))):
+                    sys.exit(f"{short}/{di}: shape order does not cover the stops")
+                ds = [ds[i] for i in shape["order"]]
+                coords = [stops_by_id[s["placeId"]]["geometry"]["coordinates"] for s in ds]
                 line_coords = shape["line"]
+                d = [round(x, 1) for x in shape["stopD"]]
                 m = [round(x, 1) for x in shape["stopM"]]
                 n_shaped += 1
             else:
+                coords = [stops_by_id[s["placeId"]]["geometry"]["coordinates"] for s in ds]
+                # d: metres along Remix's own (unpublished) shape, rebased so the first stop is 0.
+                d = [round(s["distanceFromStart"] - ds[0]["distanceFromStart"], 1) for s in ds]
                 line_coords = [[round(c[0], 6), round(c[1], 6)] for c in coords]
                 m = [0.0]
                 for a, b in zip(coords, coords[1:]):
                     m.append(round(m[-1] + haversine(a, b), 1))
+            if any(y < x for x, y in zip(d, d[1:])) or any(y < x for x, y in zip(m, m[1:])):
+                sys.exit(f"{short}/{di}: stop distances are not non-decreasing")
 
             dirs.append({
                 "name": direction["name"].capitalize(),
