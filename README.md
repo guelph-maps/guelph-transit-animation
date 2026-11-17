@@ -145,8 +145,8 @@ of the stops (Overpass API, fetched 2026-11-17, kept in `source/osm/`):
 
 Result: 32,439 nodes, 37,703 segments, 1,557 km, 763 KB. Every stop is within 30 m of
 it. Between stops 150–400 m apart in a straight line, the walk is 1.23 times the
-straight line at the median and 1.62 at the 90th percentile; the worst (3–4.5 times)
-are crescents and the railway.
+straight line at the median and 1.62 at the 90th percentile; the worst are 3 to
+4.5 times, which were not looked at one by one.
 
 ## Route shapes
 
@@ -207,8 +207,11 @@ Run in the browser console (`window.sim` exposes the simulation):
   minutes at the median, 14 at most). That is the rule above: a walk of over 15 minutes
   is only chosen when the buses would take one and a half times as long.
 - The bicycle is there first in 583 of the 600.
-- The page loads without console errors and all layers draw. **The road-shape version
-  has not been watched playing in a browser yet.**
+- The same 600 trips on the version before the streets (straight lines times 1.3)
+  gave 33 such trips, so the streets did not bring them in.
+- The page loads without console errors and all layers draw; a trip was watched with
+  its walks on the streets and the bicycle beside it, on a desktop and a phone-sized
+  window.
 
 ## Not done
 

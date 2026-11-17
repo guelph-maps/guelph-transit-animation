@@ -150,6 +150,13 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
   }
   #trip-panel { top: 8px; left: 8px; right: 48px; width: auto; max-height: 27%; padding: 8px 12px; }
   #trip-when { font-size: 18px; }
+  /* The panel is short here: the bicycle goes above the steps, not below the fold. */
+  #trip-panel { display: flex; flex-direction: column; }
+  #trip-panel > * { order: 2; flex: none; }
+  #trip-status, #trip-when, #trip-buses { order: 0; }
+  #trip-bike { order: 1; margin: 0 0 6px !important; padding: 0; border: 0; }
+  #trip-bike small { display: inline; margin-left: 6px; }
+  #trip-buses { margin-bottom: 4px !important; }
   #clock-time { font-size: 26px; }
   h1 span { display: inline; }
 }
