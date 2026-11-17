@@ -11,6 +11,8 @@ a legend.
 
 Not an official City of Guelph product.
 
+Live: https://guelph-maps.github.io/guelph-transit-animation/
+
 ## What it does
 
 - Buses move along all 34 proposed routes over a service day, 5 am to 2 am.
@@ -53,7 +55,8 @@ average speed.
 ## Data
 
 `data/network.json` is the only data the page loads. `tools/build_data.py` builds it from
-two local inputs that are not in this repository:
+two local inputs that are not in this repository (the raw city files stay local;
+only derived data is published):
 
 - `source/remix/maps_85f5b7bf.json` — the data behind the public Remix map
   (`https://platform.remix.com/api/maps/85f5b7bf`, fetched 2026-11-17, no login).
@@ -125,14 +128,6 @@ Run in the browser console (`window.sim` exposes the simulation):
   high-frequency PDF map: same corridors and overall layout, not a street-by-street check.
 - The page loads without console errors and all layers draw. **The road-shape version
   has not been watched playing in a browser yet.**
-
-## Before publishing
-
-- **`source/` is in the first two commits and must come out of history before the first
-  push.** It is untracked and git-ignored now, but the raw PDFs and Remix JSON are still
-  in the history. The public repository is meant to carry derived data only.
-- The repository is meant to live in the `guelph-maps` GitHub organization. No remote
-  exists yet; `/gh-init` creates one.
 
 ## Not done
 
