@@ -36,7 +36,8 @@ every rack in the city, by type and number of spaces.
   of half a minute or more, and every ride is a step of its own.
 - The panel is headed by the two totals, the rider's and the bicycle's, in the largest
   type there: how long each took is what is being compared. Under each is its
-  door-to-door speed (see below).
+  door-to-door speed (see below). The totals are repeated in bold where each timeline
+  ends: on the Arrive row, and at the foot of the bicycle's line.
 - A shadow bicycle sets out with the rider, from the same place to the same place at the
   same moment. In the trip panel its line runs down beside the rider's steps, on their
   clock: the steps are rows, not a scale, so each row's time is a mark and the bicycle
@@ -278,6 +279,11 @@ Run in the browser console (`window.sim` exposes the simulation):
   window, the switch thrown off and on again during it, a trip of 140 m with one rack
   nearest both ends (the shadow walks), and one of 430 m where the nearest rack is the
   wrong way.
+
+- The trip panel's head and the rack card were looked at on a desktop and a phone-sized
+  window: a one-bus trip with parking off and on (23 min at 7.4 km/h against 12 min at
+  15 km/h, then 13 min at 13 km/h), and a 120 m trip both walk (4.8 km/h each, the
+  shadow on foot). The switch while still disabled and a trip the bus wins were not.
 
 ## Not done
 

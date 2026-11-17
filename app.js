@@ -933,7 +933,7 @@
     });
     marks.push({ t: plan.t1, t1: Infinity });
     plan.marks = marks;
-    rows.push('<li class="arrive"><time>' + fmtClock(plan.t1) + '</time><span>Arrive' + (plan.winner === 'rider' ? ' ' + AWARD : '') + '</span><em></em></li>');
+    rows.push('<li class="arrive"><time>' + fmtClock(plan.t1) + '</time><span>Arrive' + (plan.winner === 'rider' ? ' ' + AWARD : '') + '</span><em>' + fmtMin(plan.t1 - plan.t0) + '</em></li>');
 
     // The head: the two totals, the thing compared, with each one's door-to-door speed.
     const big = secs => '<b>' + fmtMin(secs).replace(' min', '<span>min</span>') + '</b>';
@@ -955,7 +955,7 @@
     $('trip-bike').innerHTML = big(bike.t1 - plan.t0) + '<small>' + (bike.afoot ? AFOOT : BIKE) + speed(bike.t1 - plan.t0) + '</small>';
     $('trip-bike').title = how;
     $('trip-rail').innerHTML = bike.legs.map(leg => '<i class="line ' + leg.type + '"></i>').join('')
-      + '<i class="at"></i><div class="end"><b>' + fmtClock(bike.t1) + '</b><small>'
+      + '<i class="at"></i><div class="end"><b>' + fmtClock(bike.t1) + '</b><strong>' + fmtMin(bike.t1 - plan.t0) + '</strong><small>'
       + fmtDist(bike.m) + '</small>' + (foot ? '<small>' + foot + '</small>' : '') + (plan.winner === 'bike' ? AWARD : '') + '</div>';
     $('trip-rail').setAttribute('aria-label', how + ': ' + fmtMin(bike.t1 - plan.t0) + ', there at ' + fmtClock(bike.t1)
       + ', ' + fmtSpeed(plan.direct, bike.t1 - plan.t0) + ' door to door'

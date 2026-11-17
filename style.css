@@ -139,6 +139,9 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 #trip-steps span { flex: 1; min-width: 0; }
 #trip-steps small { display: block; font-size: 12px; color: var(--muted); }
 #trip-steps em { flex: none; font-style: normal; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+/* The last row sums the rows above it: the total, as the bicycle's line ends on its own. */
+#trip-steps li.arrive em, #trip-rail .end strong { color: var(--ink); font-weight: 650; }
+#trip-rail .end strong { display: block; font-variant-numeric: tabular-nums; }
 #trip-steps li.done { opacity: 0.55; }
 #trip-steps li.now { border-left-color: var(--ink); background: #f3f5f7; }
 #trip-steps li.now > span { font-weight: 600; }
