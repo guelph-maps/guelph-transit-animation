@@ -28,10 +28,14 @@ Live: https://guelph-maps.github.io/guelph-transit-animation/
   changing buses as often as it takes. A floating panel shows the trip: when they leave and
   arrive, which buses they take, each step with its times, and how long they spend
   walking, waiting and riding.
+- A shadow bicycle sets out with the rider, from the same place to the same place at the
+  same moment, and the trip panel says how long it takes and how much sooner or later
+  it is there.
 
 ## Run it
 
-It is a static site: `index.html`, `app.js`, `style.css` and `data/network.json`.
+It is a static site: `index.html`, `app.js`, `style.css`, `data/network.json` and
+`data/streets.json`.
 Serve the folder with anything, for example:
 
 ```
@@ -64,14 +68,18 @@ The rider takes the same made-up timetable the bus dots follow, so during a ride
 figure is on an actual simulated bus. The plan is the earliest arrival for leaving at the
 time shown (a RAPTOR search, up to five boardings), under these assumptions:
 
-- **Walking is a straight line** at 4.8 km/h, with distances multiplied by 1.3 for the
-  streets not being straight.
-- **The rider walks to the nearest stop** (or one within 100 m of it, the stop across
-  the street). They start at one up to 400 m farther in a straight line, the other route
-  round the corner, only if that gets them there at least a minute sooner: not to board
-  the bus they would have changed to anyway. From the bus to where they are going they
-  walk from the nearest stop or one up to 400 m farther. Between buses they walk up to
-  400 m. Everything else is done by bus, with as many changes as it takes.
+- **Walking follows the streets** of `data/streets.json` at 4.8 km/h: the shortest way
+  along streets, paths and steps, plus the straight bit from the door to the nearest
+  street. Separately mapped sidewalks and crossings are left out, so the rider walks the
+  street itself and crosses wherever they like. All distances below are metres walked.
+  Until the streets have loaded (about 310 KB compressed, fetched after the first
+  frame) walks are straight lines multiplied by 1.3.
+- **The rider walks to the nearest stop** (or one within 130 m of it, the stop across
+  the street). They start at one up to 500 m farther, the other route round the corner,
+  only if that gets them there at least a minute sooner: not to board the bus they
+  would have changed to anyway. From the bus to where they are going they walk from the
+  nearest stop or one up to 500 m farther. Between buses they walk up to 500 m.
+  Everything else is done by bus, with as many changes as it takes.
 - **A change needs 60 s** at the stop, and a boarding has to save 3 minutes to be worth
   making.
 - **Walking the whole way** happens when no bus gets there at that hour, when it takes
@@ -84,9 +92,17 @@ time shown (a RAPTOR search, up to five boardings), under these assumptions:
   dragging the figure drops it; a trip still under way when the clock wraps at 2 am ends
   at its destination.
 
+## The shadow bicycle
+
+For comparison only. It leaves when the rider does and takes the shortest way along the
+same street network at a flat 15 km/h, lights and stops included. "The same route" is
+read as the same start, end and leaving time, not the bus's path. It rides anything the
+rider can walk, steps and footpaths included, and knows nothing of hills, one-way
+streets or bike lanes.
+
 ## Data
 
-`data/network.json` is the only data the page loads. `tools/build_data.py` builds it from
+`data/network.json` holds the routes. `tools/build_data.py` builds it from
 three local inputs that are not in this repository (the raw city files stay local;
 only derived data is published):
 
@@ -94,8 +110,7 @@ only derived data is published):
   (`https://platform.remix.com/api/maps/85f5b7bf`, fetched 2026-11-17, no login).
   It has the 34 lines, 824 stops, the ordered stops of each direction with their distance
   along the route, and the service windows. It has **no line geometry**.
-- `source/remix/projects_6a3a211f.json` — the Remix project behind the same map
-  (`https://platform.remix.com/api/projects/6a3a211f`). Its line settings hold the colour
+- `source/remix/projects_6a3a211f.json` — the Remix project behind the same map. Its line settings hold the colour
   and dash of each of the 34 lines, which is where the colours here come from. They
   match the legend of the city's "Proposed Network: All Routes" PDF. Pairs that are one
   service share a colour: 80/81, 82/83, 51/52, 12A/12B.
@@ -111,6 +126,27 @@ Remix map: https://platform.remix.com/project/6a3a211f
 Route classes come from the route number (80s and 90s high-frequency, 50s university,
 the rest base), which gives the 10 / 17 / 6 split the city describes when 12A and 12B
 count as one route.
+
+## Streets
+
+`data/streets.json` is the network the rider walks and the bicycle rides.
+`tools/build_streets.py` builds it from every OpenStreetMap `highway` way within 1.5 km
+of the stops (Overpass API, fetched 2026-11-17, kept in `source/osm/`):
+
+- Kept: streets, service roads, paths, footways, cycleways, steps, tracks, and Wyndham
+  and Quebec streets, which are being rebuilt as this is written.
+- Dropped: the Hanlon Expressway and its ramps, anything marked private or closed to
+  people on foot, driveways, parking aisles and drive-throughs.
+- **Sidewalks and crossings mapped as their own lines are dropped** (7,416 ways); the
+  street they run along stands in. A path that ended at a sidewalk is joined to the
+  nearest street within 30 m instead (3,166 joins), or it would lead nowhere.
+- Bends are straightened to within 4 m and the 593 pieces not connected to the main
+  network are removed.
+
+Result: 32,439 nodes, 37,703 segments, 1,557 km, 763 KB. Every stop is within 30 m of
+it. Between stops 150–400 m apart in a straight line, the walk is 1.23 times the
+straight line at the median and 1.62 at the 90th percentile; the worst (3–4.5 times)
+are crescents and the railway.
 
 ## Route shapes
 
@@ -150,7 +186,7 @@ crawl or race there.
 On four routes the two directions do not meet at one end (10, 53, 80, 93; gaps of
 270–490 m), so a bus jumps that far when it turns around.
 
-Route geometry is derived from OpenStreetMap, © OpenStreetMap contributors, ODbL, routed
+Route geometry and streets are derived from OpenStreetMap, © OpenStreetMap contributors, ODbL, routed
 with OSRM and Valhalla (FOSSGIS server).
 
 ## Checks
@@ -163,9 +199,14 @@ Run in the browser console (`window.sim` exposes the simulation):
 - Peak buses out: 84 weekday, 67 Saturday, 67 Sunday. Nothing is out at 4:50 am.
 - The routed lines were drawn to an image and looked over against the city's
   high-frequency PDF map: same corridors and overall layout, not a street-by-street check.
-- 600 random trips over the three day types: in every ride leg the figure is within a
-  millimetre of a simulated bus of that route and direction, no trip is slower than
-  walking, and no weekday-only route is used on a weekend. At 3 am the plan is a walk.
+- 600 random trips over the three day types, walking on the streets: in every ride leg
+  the figure is within a millimetre of a simulated bus of that route and direction, the
+  rider is at every stop before their bus, every walk's line is as long as its time
+  says, and no weekday-only route is used on a weekend. At 3 am the plan is a walk.
+- In 42 of those 600 the buses are slower than walking the whole way would be (by 3
+  minutes at the median, 14 at most). That is the rule above: a walk of over 15 minutes
+  is only chosen when the buses would take one and a half times as long.
+- The bicycle is there first in 583 of the 600.
 - The page loads without console errors and all layers draw. **The road-shape version
   has not been watched playing in a browser yet.**
 

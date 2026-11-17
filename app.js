@@ -12,23 +12,26 @@
   const T_MIN = 300 * 60;   // 05:00
   const T_MAX = 1560 * 60;  // 02:00 next day
 
-  // The rider: walks in straight lines at WALK_SPEED, with WALK_DETOUR for the streets
-  // not being straight.
+  // The rider walks along the streets of data/streets.json at WALK_SPEED. Until that
+  // file has loaded (or if it does not), they walk in straight lines, with WALK_DETOUR
+  // for the streets not being straight. All walking limits are metres walked.
   const WALK_SPEED = 4.8 / 3.6;   // m/s
   const WALK_DETOUR = 1.3;
-  const ACCESS_MARGIN = 400;      // m: the rider uses the nearest stop, or one up to this much farther
-  const NEAR_MARGIN = 100;        // m: stops this close to the nearest one count as the nearest
+  const BIKE_SPEED = 15 / 3.6;    // m/s: the shadow bicycle, stops and lights included
+  const ACCESS_MARGIN = 500;      // m: the rider uses the nearest stop, or one up to this much farther
+  const NEAR_MARGIN = 130;        // m: stops this close to the nearest one count as the nearest
   const FAR_STOP_GAIN = 60;       // s sooner a trip must arrive to start at a stop farther than those
   const WALK_ALL_MAX = 15 * 60;   // s: the longest trip the rider will walk when a bus could do it
   const WALK_ALL_RATIO = 1.5;     // ...unless the buses would take this many times as long
-  const TRANSFER_RADIUS = 400;    // m, straight line, between stops when changing buses
+  const TRANSFER_WALK = 500;      // m on foot between stops when changing buses
   const TRANSFER_SLACK = 60;      // s needed at a stop before boarding the next bus
   const BOARD_PENALTY = 180;      // s a boarding must save to be worth making
   const MAX_BOARDINGS = 5;
 
   const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 300 };
-  const rider = { pos: null, plan: null, marker: null, destMarker: null, step: null, draggedAt: 0 };
+  const rider = { pos: null, plan: null, marker: null, bikeMarker: null, destMarker: null, step: null, draggedAt: 0 };
   let net = null;
+  let streets = null;
   let map = null;
   let lastWidths = '';
 
@@ -82,13 +85,178 @@
       s.u = index.get(key);
     }
     for (let a = 0; a < data.ustops.length; a++) for (let b = a + 1; b < data.ustops.length; b++) {
-      const m = haversine(data.ustops[a].pos, data.ustops[b].pos);
-      if (m > TRANSFER_RADIUS) continue;
-      const secs = m * WALK_DETOUR / WALK_SPEED;
-      data.ustops[a].near.push({ u: b, secs });
-      data.ustops[b].near.push({ u: a, secs });
+      const m = haversine(data.ustops[a].pos, data.ustops[b].pos) * WALK_DETOUR;
+      if (m > TRANSFER_WALK) continue;
+      data.ustops[a].near.push({ u: b, secs: m / WALK_SPEED });
+      data.ustops[b].near.push({ u: a, secs: m / WALK_SPEED });
     }
     return data;
+  }
+
+  // ---------- streets ----------
+  //
+  // data/streets.json is the walkable street network as nodes and the ways joining
+  // them. Here it becomes a graph of straight segments, in metres on a flat local grid.
+
+  const CELL = 100;   // m, of the grid used to find the street nearest a point
+
+  function buildStreets(data) {
+    const n = data.xy.length / 2, sc = data.scale, [lon0, lat0] = data.origin;
+    let top = 0;
+    for (let i = 1; i < data.xy.length; i += 2) top = Math.max(top, data.xy[i]);
+    const ky = 111320, kx = ky * Math.cos((lat0 + top / sc / 2) * Math.PI / 180);
+    const X = new Float64Array(n), Y = new Float64Array(n);
+    for (let i = 0; i < n; i++) { X[i] = data.xy[2 * i] / sc * kx; Y[i] = data.xy[2 * i + 1] / sc * ky; }
+
+    let m = 0;
+    for (const w of data.ways) m += w.length - 1;
+    const A = new Int32Array(m), B = new Int32Array(m), L = new Float64Array(m);
+    const off = new Int32Array(n + 1);
+    let k = 0;
+    for (const w of data.ways) for (let i = 1; i < w.length; i++, k++) {
+      A[k] = w[i - 1]; B[k] = w[i];
+      L[k] = Math.hypot(X[A[k]] - X[B[k]], Y[A[k]] - Y[B[k]]);
+      off[A[k] + 1]++; off[B[k] + 1]++;
+    }
+    for (let i = 0; i < n; i++) off[i + 1] += off[i];
+    const fill = off.slice(0, n), adjNode = new Int32Array(2 * m), adjLen = new Float64Array(2 * m);
+    const grid = new Map();
+    for (k = 0; k < m; k++) {
+      adjNode[fill[A[k]]] = B[k]; adjLen[fill[A[k]]++] = L[k];
+      adjNode[fill[B[k]]] = A[k]; adjLen[fill[B[k]]++] = L[k];
+      const x0 = Math.min(X[A[k]], X[B[k]]), x1 = Math.max(X[A[k]], X[B[k]]);
+      const y0 = Math.min(Y[A[k]], Y[B[k]]), y1 = Math.max(Y[A[k]], Y[B[k]]);
+      for (let gx = Math.floor(x0 / CELL); gx <= Math.floor(x1 / CELL); gx++) for (let gy = Math.floor(y0 / CELL); gy <= Math.floor(y1 / CELL); gy++) {
+        const key = gx * 4096 + gy;
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key).push(k);
+      }
+    }
+    return { n, X, Y, A, B, L, off, adjNode, adjLen, grid, kx, ky, lon0, lat0 };
+  }
+
+  // The point of the street network nearest to `p`: on segment `k`, the share `t` of the
+  // way along it, `off` metres from `p`.
+  function snap(p) {
+    const S = streets, px = (p[0] - S.lon0) * S.kx, py = (p[1] - S.lat0) * S.ky;
+    const gx = Math.floor(px / CELL), gy = Math.floor(py / CELL);
+    let best = Infinity, bk = -1, bt = 0;
+    for (let r = 0; r < 300 && best > r * CELL; r++) {
+      for (let ix = gx - r; ix <= gx + r; ix++) for (let iy = gy - r; iy <= gy + r; iy++) {
+        if (ix < 0 || iy < 0 || Math.max(Math.abs(ix - gx), Math.abs(iy - gy)) !== r) continue;
+        const list = S.grid.get(ix * 4096 + iy);
+        if (!list) continue;
+        for (const k of list) {
+          const ax = S.X[S.A[k]], ay = S.Y[S.A[k]], dx = S.X[S.B[k]] - ax, dy = S.Y[S.B[k]] - ay;
+          const t = S.L[k] > 0 ? Math.min(1, Math.max(0, ((px - ax) * dx + (py - ay) * dy) / (S.L[k] * S.L[k]))) : 0;
+          const d = Math.hypot(px - ax - t * dx, py - ay - t * dy);
+          if (d < best) { best = d; bk = k; bt = t; }
+        }
+      }
+    }
+    if (bk < 0) return null;
+    const a = S.A[bk], b = S.B[bk];
+    return { p, k: bk, t: bt, off: best,
+      pt: [S.lon0 + (S.X[a] + bt * (S.X[b] - S.X[a])) / S.kx, S.lat0 + (S.Y[a] + bt * (S.Y[b] - S.Y[a])) / S.ky] };
+  }
+
+  // Shortest walks from a snapped point to every node within `limit` metres (Dijkstra).
+  function walkTree(s, limit) {
+    const S = streets, dist = new Float64Array(S.n).fill(Infinity), prev = new Int32Array(S.n).fill(-1);
+    const hk = [], hv = [];   // a binary heap of (metres, node, came from)
+    const push = (d, v, from) => {
+      let i = hk.length;
+      hk.push(d); hv.push(v, from);
+      while (i > 0) {
+        const up = (i - 1) >> 1;
+        if (hk[up] <= d) break;
+        hk[i] = hk[up]; hv[2 * i] = hv[2 * up]; hv[2 * i + 1] = hv[2 * up + 1];
+        i = up;
+      }
+      hk[i] = d; hv[2 * i] = v; hv[2 * i + 1] = from;
+    };
+    const pop = () => {
+      const top = [hk[0], hv[0], hv[1]], d = hk.pop(), from = hv.pop(), v = hv.pop(), n = hk.length;
+      let i = 0;
+      while (n) {
+        let c = 2 * i + 1;
+        if (c >= n) break;
+        if (c + 1 < n && hk[c + 1] < hk[c]) c++;
+        if (hk[c] >= d) break;
+        hk[i] = hk[c]; hv[2 * i] = hv[2 * c]; hv[2 * i + 1] = hv[2 * c + 1];
+        i = c;
+      }
+      if (n) { hk[i] = d; hv[2 * i] = v; hv[2 * i + 1] = from; }
+      return top;
+    };
+    push(s.t * S.L[s.k], S.A[s.k], -1);
+    push((1 - s.t) * S.L[s.k], S.B[s.k], -1);
+    while (hk.length) {
+      const [d, u, from] = pop();
+      if (d > limit) break;
+      if (dist[u] <= d) continue;
+      dist[u] = d; prev[u] = from;
+      for (let e = S.off[u]; e < S.off[u + 1]; e++) {
+        const v = S.adjNode[e];
+        if (dist[v] === Infinity) push(d + S.adjLen[e], v, u);
+      }
+    }
+    return { s, dist, prev };
+  }
+
+  // Metres on foot from the start of a tree to a snapped point, door to door, and the
+  // node the walk reaches the point's segment at (-1: both are on the same segment).
+  function reach(tree, s) {
+    const S = streets, len = S.L[s.k];
+    const viaA = tree.dist[S.A[s.k]] + s.t * len, viaB = tree.dist[S.B[s.k]] + (1 - s.t) * len;
+    const same = tree.s.k === s.k ? Math.abs(tree.s.t - s.t) * len : Infinity;
+    const m = Math.min(viaA, viaB, same);
+    return { m: tree.s.off + s.off + m, end: m === same ? -1 : m === viaA ? S.A[s.k] : S.B[s.k] };
+  }
+
+  function metresTo(tree, s) {
+    return reach(tree, s).m;
+  }
+
+  // The same walk with its line, from the start of the tree to the point.
+  function walkTo(tree, s) {
+    const S = streets, r = reach(tree, s), mid = [];
+    for (let u = r.end; u >= 0; u = tree.prev[u]) mid.push([S.lon0 + S.X[u] / S.kx, S.lat0 + S.Y[u] / S.ky]);
+    return { m: r.m, line: [tree.s.p, tree.s.pt, ...mid.reverse(), s.pt, s.p] };
+  }
+
+  // A walk with no streets to follow.
+  function crowWalk(a, b) {
+    return { m: haversine(a, b) * WALK_DETOUR, line: [a, b] };
+  }
+
+  // Once the streets are in: put every stop on them, and redo which stops are close
+  // enough to walk between.
+  function useStreets(data) {
+    streets = buildStreets(data);
+    const stops = net.ustops;
+    for (const s of stops) { s.snap = snap(s.pos); s.near = []; }
+    for (let a = 0; a < stops.length; a++) {
+      const tree = walkTree(stops[a].snap, TRANSFER_WALK);
+      for (let b = 0; b < stops.length; b++) {
+        if (b === a || haversine(stops[a].pos, stops[b].pos) > TRANSFER_WALK) continue;
+        const m = metresTo(tree, stops[b].snap);
+        if (m <= TRANSFER_WALK) stops[a].near.push({ u: b, secs: m / WALK_SPEED });
+      }
+    }
+  }
+
+  // Cumulative metres along a line, and the point a share `f` of the way along it.
+  function measure(line) {
+    const cum = [0];
+    for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + haversine(line[i - 1], line[i]));
+    return cum;
+  }
+
+  function alongLine(line, cum, f) {
+    const m = Math.min(1, Math.max(0, f)) * cum[cum.length - 1], j = segment(cum, m);
+    const g = cum[j + 1] > cum[j] ? (m - cum[j]) / (cum[j + 1] - cum[j]) : 0;
+    return [line[j][0] + g * (line[j + 1][0] - line[j][0]), line[j][1] + g * (line[j + 1][1] - line[j][1])];
   }
 
   // Point `m` metres along a direction's line.
@@ -167,10 +335,6 @@
   // trip k is at stop i of direction 0 at start + k * headway + d_i / v, and of
   // direction 1 the outbound run and the layover later.
 
-  function walkSecs(a, b) {
-    return haversine(a, b) * WALK_DETOUR / WALK_SPEED;
-  }
-
   // The first bus of a direction that leaves stop `i` at or after `ready`.
   function earliestTrip(route, di, i, ready, day) {
     let best = null;
@@ -186,39 +350,72 @@
     return best;
   }
 
-  // Seconds on foot between a point and each stop the rider would use from there: the
-  // nearest one and any up to `margin` farther (the stop across the street, the other
-  // route round the corner). Infinity for the rest.
-  function stopsNear(p, margin) {
-    const stops = net.ustops, d = stops.map(s => haversine(p, s.pos));
-    const limit = Math.min(...d) + margin;
-    return Float64Array.from(d, m => m <= limit ? m * WALK_DETOUR / WALK_SPEED : Infinity);
+  // Everything about walking one trip: how far each stop is on foot from the start and
+  // from the end, and the walk straight there.
+  function tripWalks(from, to) {
+    const stops = net.ustops;
+    const sf = streets && snap(from), st = streets && snap(to);
+    if (!sf || !st) {
+      return { from, to, direct: crowWalk(from, to),
+        access: stops.map(s => haversine(from, s.pos) * WALK_DETOUR), egress: stops.map(s => haversine(s.pos, to) * WALK_DETOUR) };
+    }
+    const fromTree = walkTree(sf, Infinity), toTree = walkTree(st, Infinity);
+    return { from, to, fromTree, toTree, direct: walkTo(fromTree, st),
+      access: stops.map(s => metresTo(fromTree, s.snap)), egress: stops.map(s => metresTo(toTree, s.snap)) };
+  }
+
+  // The walk of one leg: from the start to stop `ub`, from stop `ua` to the end, or
+  // between the two stops (-1 standing for the start or the end).
+  function legWalk(walks, ua, ub) {
+    const stops = net.ustops;
+    if (ua < 0 && ub < 0) return walks.direct;
+    if (ua < 0) return walks.fromTree ? walkTo(walks.fromTree, stops[ub].snap) : crowWalk(walks.from, stops[ub].pos);
+    if (ub < 0) {
+      if (!walks.toTree) return crowWalk(stops[ua].pos, walks.to);
+      const w = walkTo(walks.toTree, stops[ua].snap);
+      return { m: w.m, line: w.line.reverse() };
+    }
+    return walks.fromTree ? walkTo(walkTree(stops[ua].snap, TRANSFER_WALK), stops[ub].snap) : crowWalk(stops[ua].pos, stops[ub].pos);
+  }
+
+  // Seconds on foot for each stop the rider would use from a point, given the metres to
+  // every stop: the nearest one and any up to `margin` farther (the stop across the
+  // street, the other route round the corner). Infinity for the rest.
+  function stopsNear(metres, margin) {
+    const limit = Math.min(...metres) + margin;
+    return Float64Array.from(metres, m => m <= limit ? m / WALK_SPEED : Infinity);
   }
 
   // The trip from `from` to `to` leaving at `t0`. The rider starts at the nearest stop
   // unless a farther one gets them there sooner: walking past it to the line they would
   // change to anyway, only to board the same bus, is not what people do.
   function planTrip(from, to, t0, day) {
-    const near = planFrom(from, to, t0, day, NEAR_MARGIN);
-    const far = planFrom(from, to, t0, day, ACCESS_MARGIN);
+    const walks = tripWalks(from, to);
+    const near = planFrom(walks, t0, day, NEAR_MARGIN);
+    const far = planFrom(walks, t0, day, ACCESS_MARGIN);
     // If the nearest stop has no bus worth taking, the wider plan decides whether to walk.
     const rides = near.legs.some(leg => leg.type === 'ride');
-    return !rides || far.t1 <= near.t1 - FAR_STOP_GAIN ? far : near;
+    const plan = !rides || far.t1 <= near.t1 - FAR_STOP_GAIN ? far : near;
+    // The shadow bicycle: the same start, end and leaving time, along the shortest way
+    // by the streets.
+    const line = walks.direct.line;
+    plan.bike = { line, cum: measure(line), m: walks.direct.m, t1: t0 + walks.direct.m / BIKE_SPEED };
+    return plan;
   }
 
   // Earliest arrival from `from` to `to` leaving at `t0`, in rounds of one more boarding
   // each (RAPTOR). The rider walks only to the stops near the start (up to `margin`
   // farther than the nearest), between nearby stops to change buses, and from the stops
   // near the end. Returns the legs, with their times.
-  function planFrom(from, to, t0, day, margin) {
-    const stops = net.ustops, n = stops.length;
-    const access = stopsNear(from, margin), egress = stopsNear(to, ACCESS_MARGIN);
+  function planFrom(walks, t0, day, margin) {
+    const stops = net.ustops, n = stops.length, { from, to } = walks;
+    const access = stopsNear(walks.access, margin), egress = stopsNear(walks.egress, ACCESS_MARGIN);
     const best = new Float64Array(n);
     let prev = new Float64Array(n);
     const how = [new Array(n)];             // how[k][u]: what brought the rider to u in round k
     for (let u = 0; u < n; u++) prev[u] = best[u] = t0 + access[u];
 
-    const direct = t0 + walkSecs(from, to);
+    const direct = t0 + walks.direct.m / WALK_SPEED;
     let win = { score: Infinity, k: 0, u: -1 };
 
     for (let k = 1; k <= MAX_BOARDINGS; k++) {
@@ -274,28 +471,26 @@
     // Walk the winner back to the start, then time the legs forwards.
     const legs = [];
     let { k, u } = win;
-    let end = to, endName = null;
+    let end = -1;                   // the stop the next walk leads to; -1: where they are going
+    const walkLeg = ua => Object.assign({ type: 'walk', to: end < 0 ? null : stops[end].name }, legWalk(walks, ua, end));
     while (k > 0) {
       const h = k === win.k ? win.ride : how[k][u];
       if (h.walkFrom !== undefined) {
-        legs.unshift({ type: 'walk', a: stops[h.walkFrom].pos, b: end, to: endName });
-        end = stops[h.walkFrom].pos;
-      } else if (end !== stops[u].pos) {
-        legs.unshift({ type: 'walk', a: stops[u].pos, b: end, to: endName });
+        legs.unshift(walkLeg(h.walkFrom));
+      } else if (end !== u) {
+        legs.unshift(walkLeg(u));
       }
       const dir = net.routes[h.r].dirs[h.di];
       legs.unshift({ type: 'ride', r: h.r, di: h.di, i0: h.i0, i1: h.i1, start: h.start, v: h.v,
         t0: h.start + dir.stopD[h.i0] / h.v, t1: h.start + dir.stopD[h.i1] / h.v });
-      u = dir.stops[h.i0].u;
-      end = stops[u].pos;
-      endName = stops[u].name;
+      end = u = dir.stops[h.i0].u;
       k--;
     }
-    legs.unshift({ type: 'walk', a: from, b: end, to: endName });
+    legs.unshift(walkLeg(-1));
 
     let t = t0;
     for (const leg of legs) {
-      if (leg.type === 'walk') { leg.t0 = t; leg.t1 = t + walkSecs(leg.a, leg.b); }
+      if (leg.type === 'walk') { leg.t0 = t; leg.t1 = t + leg.m / WALK_SPEED; leg.cum = measure(leg.line); }
       else leg.ready = t;           // the rider waits at the stop from `ready` to `t0`
       t = leg.t1;
     }
@@ -308,10 +503,7 @@
     for (let i = 0; i < plan.legs.length; i++) {
       const leg = plan.legs[i];
       if (t >= leg.t1) continue;
-      if (leg.type === 'walk') {
-        const f = Math.max(0, (t - leg.t0) / (leg.t1 - leg.t0));
-        return { pos: [leg.a[0] + f * (leg.b[0] - leg.a[0]), leg.a[1] + f * (leg.b[1] - leg.a[1])], step: i };
-      }
+      if (leg.type === 'walk') return { pos: alongLine(leg.line, leg.cum, (t - leg.t0) / (leg.t1 - leg.t0)), step: i };
       const dir = net.routes[leg.r].dirs[leg.di];
       return { pos: positionAt(dir, Math.max(t, leg.t0) * leg.v - leg.start * leg.v), step: i };
     }
@@ -320,13 +512,13 @@
 
   function tripFeatures(plan) {
     const features = [];
-    if (plan) for (const leg of plan.legs) {
-      const ride = leg.type === 'ride';
-      features.push({
-        type: 'Feature',
-        properties: { kind: leg.type, color: ride ? net.routes[leg.r].color : INK },
-        geometry: { type: 'LineString', coordinates: ride ? lineBetween(net.routes[leg.r].dirs[leg.di], leg.i0, leg.i1) : [leg.a, leg.b] },
-      });
+    const add = (kind, color, coordinates) => features.push({ type: 'Feature', properties: { kind, color }, geometry: { type: 'LineString', coordinates } });
+    if (plan) {
+      add('bike', INK, plan.bike.line);
+      for (const leg of plan.legs) {
+        if (leg.type === 'walk') add('walk', INK, leg.line);
+        else add('ride', net.routes[leg.r].color, lineBetween(net.routes[leg.r].dirs[leg.di], leg.i0, leg.i1));
+      }
     }
     return { type: 'FeatureCollection', features };
   }
@@ -406,12 +598,14 @@
         'circle-stroke-color': '#55606e', 'circle-stroke-width': 1 } });
 
     map.addSource('trip', { type: 'geojson', data: tripFeatures(null) });
+    map.addLayer({ id: 'trip-bike', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'bike'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#7a8494', 'line-width': 2.5, 'line-opacity': 0.75 } });
     map.addLayer({ id: 'trip-ride-case', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'ride'],
       layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': INK, 'line-width': 9 } });
     map.addLayer({ id: 'trip-ride', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'ride'],
       layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': lineColor, 'line-width': 5 } });
     map.addLayer({ id: 'trip-walk', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'walk'],
-      paint: { 'line-color': INK, 'line-width': 3, 'line-dasharray': [0.6, 1.4] } });
+      layout: { 'line-join': 'round' }, paint: { 'line-color': INK, 'line-width': 3, 'line-dasharray': [0.6, 1.4] } });
 
     map.addLayer({ id: 'buses', type: 'circle', source: 'buses',
       paint: {
@@ -478,6 +672,9 @@
   const FIGURE = '<svg viewBox="0 0 26 38" aria-hidden="true"><circle cx="13" cy="6.5" r="5"/>'
     + '<path d="M13 13c-4.2 0-7 2.6-7 6v7.5h3V36.5h3.3v-9h1.4v9H17V26.5h3V19c0-3.4-2.8-6-7-6z"/></svg>';
 
+  const BIKE = '<svg viewBox="0 0 34 22" aria-hidden="true"><circle cx="7" cy="15" r="5.5"/><circle cx="27" cy="15" r="5.5"/>'
+    + '<path d="M7 15l5-9h10l5 9M12 6l5 9 5-9M10.5 3h4M22 6l-1-3.5h3"/></svg>';
+
   function esc(s) {
     return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
@@ -500,6 +697,12 @@
       rider.draggedAt = performance.now();
     });
 
+    const bike = document.createElement('div');
+    bike.className = 'bike';
+    bike.title = 'The same trip by bicycle';
+    bike.innerHTML = BIKE;
+    rider.bikeMarker = new maplibregl.Marker({ element: bike, anchor: 'bottom' });
+
     const dest = document.createElement('div');
     dest.className = 'dest';
     rider.destMarker = new maplibregl.Marker({ element: dest });
@@ -518,6 +721,7 @@
     rider.plan = null;
     rider.step = null;
     rider.destMarker.remove();
+    rider.bikeMarker.remove();
     rider.marker.setLngLat(rider.pos);
     map.getSource('trip').setData(tripFeatures(null));
     $('trip-steps').innerHTML = '';
@@ -531,6 +735,7 @@
     rider.plan = planTrip(from, to, state.t, state.day);
     rider.step = null;
     rider.destMarker.setLngLat(to).addTo(map);
+    rider.bikeMarker.setLngLat(from).addTo(map);
     map.getSource('trip').setData(tripFeatures(rider.plan));
     renderSteps(rider.plan);
     showTrip(rider.plan);
@@ -582,7 +787,7 @@
       if (leg.type === 'walk') {
         walk += leg.t1 - leg.t0;
         return '<li class="walk"><time>' + fmtClock(leg.t0) + '</time><span>Walk to ' + (leg.to ? esc(leg.to) : 'where you clicked')
-          + '<small>' + fmtDist(haversine(leg.a, leg.b) * WALK_DETOUR) + '</small></span><em>' + fmtMin(leg.t1 - leg.t0) + '</em></li>';
+          + '<small>' + fmtDist(leg.m) + '</small></span><em>' + fmtMin(leg.t1 - leg.t0) + '</em></li>';
       }
       const route = net.routes[leg.r], dir = route.dirs[leg.di];
       const waited = leg.t0 - leg.ready, n = leg.i1 - leg.i0;
@@ -605,13 +810,17 @@
     const parts = [['walk', 'Walking', walk], ['wait', 'Waiting', wait], ['ride', 'On the bus', ride]].filter(p => p[2] >= 30);
     $('trip-split').innerHTML = parts.map(p => '<i class="' + p[0] + '" style="flex-grow:' + Math.round(p[2]) + '"></i>').join('');
     $('trip-totals').innerHTML = parts.map(p => '<span class="' + p[0] + '">' + p[1] + ' <b>' + fmtMin(p[2]) + '</b></span>').join('');
+    const bike = plan.bike, ahead = plan.t1 - bike.t1;
+    $('trip-bike').innerHTML = BIKE + '<span>By bike <b>' + fmtMin(bike.t1 - plan.t0) + '</b>, there at ' + fmtClock(bike.t1)
+      + '<small>' + fmtDist(bike.m) + ' · ' + (Math.abs(ahead) < 30 ? 'the same as this trip' : fmtMin(Math.abs(ahead)) + (ahead > 0 ? ' sooner' : ' later')) + '</small></span>';
     $('trip-panel').hidden = false;
   }
 
   function renderRider() {
     if (!rider.plan) return;
-    const at = riderAt(rider.plan, state.t);
+    const at = riderAt(rider.plan, state.t), bike = rider.plan.bike;
     rider.marker.setLngLat(at.pos);
+    rider.bikeMarker.setLngLat(alongLine(bike.line, bike.cum, (state.t - rider.plan.t0) / (bike.t1 - rider.plan.t0)));
     const legs = rider.plan.legs.length, leg = rider.plan.legs[at.step];
     const status = at.step < 0 ? 'Setting out' : at.step >= legs ? 'Arrived'
       : leg.type === 'walk' ? 'Walking' : state.t < leg.t0 ? 'Waiting for the ' + net.routes[leg.r].id : 'On the ' + net.routes[leg.r].id;
@@ -709,8 +918,11 @@
     addRider();
     render();
     loop();
+    // The streets arrive after the first frame; until then walks are straight lines.
+    fetch('data/streets.json').then(r => r.json()).then(useStreets)
+      .catch(err => console.error('no street network, walking in straight lines:', err));
     // For checking the simulation from the console.
-    window.sim = { net, map, state, rider, busesAt, tripTimes, headwayAt, render, planTrip, planFrom, riderAt, sendRider, clearTrip };
+    window.sim = { net, map, state, rider, busesAt, tripTimes, headwayAt, render, planTrip, riderAt, sendRider, clearTrip, positionAt, snap, walkTree, metresTo, get streets() { return streets; } };
   }
 
   start().catch(err => {
