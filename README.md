@@ -56,7 +56,8 @@ every rack in the city, by type and number of spaces.
   clock: the steps are rows, not a scale, so each row's time is a mark and the bicycle
   ends between the two rows it arrives between.
 - Whichever of the two is there first gets the fastest commuter's medal as it arrives,
-  in the panel and on the map, by however little.
+  in the panel and on the map. If the two are there within a minute of each other
+  nobody gets it: once both are there they shake hands (🤝), and friendship won.
 - **Park the bicycle at a rack** (a switch, on to begin with) makes the bicycle's trip
   an honest one: its rider walks to the rack nearest the start, rides to the rack
   nearest where they are going, and walks from there. The racks show on the map as
@@ -323,6 +324,11 @@ Run in the browser console (`window.sim` exposes the simulation):
   ("Waiting for the 12B · 12 min") fitting at 360 px. With the two speeds the map keeps
   59% of the height during a race at 375×667, not the 63% above. A race playing by
   itself and the marked bus at the lowest zooms were not looked at.
+
+- The tie: of 300 random weekday trips between stops, parking on, 38 end within a
+  minute of each other. One (63 min against 62, 15 s apart) was looked at on a desktop
+  and at 375×667: no handshake between the two arrivals, the handshake once both are
+  there, gone again when the clock is dragged back, and no medal anywhere.
 
 ## Not done
 
