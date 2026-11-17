@@ -55,18 +55,24 @@ Remix map: https://platform.remix.com/project/6a3a211f
 - **No statutory-holiday service** in the feed; only the info sheet's "hourly" line.
 - **No current network.** A before/after comparison needs Guelph Transit's existing GTFS.
 
+## Decided (2026-11-17)
+
+- **Form:** an interactive web map — a static site with a play/pause day clock and a
+  time slider, hostable on GitHub Pages. No video for now.
+- **First version shows:** simulated buses moving on all 34 proposed routes over a
+  service day; a weekday / Saturday / Sunday toggle; route lines weighted by frequency.
+  Proposed vs current is out of scope for the first version.
+- **Source files:** the public repo carries derived data only (the processed routes,
+  stops and headways the app needs), with attribution and links to the city's page.
+  The raw PDFs and Remix JSON stay local. They are in the initial commit, so `source/`
+  must be taken out of history before the first push.
+
 ## Open questions
 
-Deliberately not decided yet:
+Still not decided:
 
-- **Form of the artifact.** Interactive web map with a time slider, a rendered video, or
-  both? Who is it for — residents answering the survey before 27 November, or a longer-
-  lived explainer?
-- **What it shows.** Individual buses moving, frequency as line weight, a day cycle,
-  weekday vs Sunday, proposed vs current — which of these is the point?
-- **How to get shapes** (see gaps above), and how accurate they must be.
-- **Whether the city's files can be redistributed** in a public repo. The PDFs and the
-  Remix JSON are public but carry no stated licence. Decide before pushing `source/`.
+- **How to get shapes** (see gaps above), and how accurate they must be. First attempt:
+  route between consecutive stops on OpenStreetMap roads, check against the PDF map.
 - **How to tell it worked.** For example: bus counts per route matching
   round-trip time ÷ headway, routes matching the PDF map by eye.
 
