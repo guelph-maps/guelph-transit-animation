@@ -901,8 +901,8 @@
     + '<circle cx="10" cy="17.5" r="5.9" style="fill:none;stroke:#fff;stroke-width:0.9;stroke-opacity:0.75"/>'
     + '<path d="M6.6 14.6l2.9 2.9-2.9 2.9M10.6 14.6l2.9 2.9-2.9 2.9" style="fill:none;stroke:#1c2330;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"/></svg>';
   const AWARD = '<span class="award" title="Fastest commuter">' + MEDAL + '<small>Fastest commuter</small></span>';
-  // The same pin holds the handshake of a tie, shown in the medal's place.
-  const PIN = '<span class="medal">' + MEDAL + '<i>🤝</i></span>';
+  const PIN = '<span class="medal" title="Fastest commuter">' + MEDAL + '</span>';
+  // A tie is nobody's: its one handshake goes between the two, never on either.
   const FRIENDS = '<span class="award friends" title="Both there within a minute"><i>🤝</i><small>Friendship won</small></span>';
 
   function esc(s) {
@@ -1043,7 +1043,7 @@
     });
     marks.push({ t: plan.t1, t1: Infinity });
     plan.marks = marks;
-    rows.push('<li class="arrive"><time>' + fmtClock(plan.t1) + '</time><span>Arrive' + (plan.winner === 'rider' ? ' ' + AWARD : plan.winner === 'tie' ? ' ' + FRIENDS : '') + '</span><em>' + fmtMin(plan.t1 - plan.t0) + '</em></li>');
+    rows.push('<li class="arrive"><time>' + fmtClock(plan.t1) + '</time><span>Arrive' + (plan.winner === 'rider' ? ' ' + AWARD : '') + '</span><em>' + fmtMin(plan.t1 - plan.t0) + '</em></li>');
 
     // The head: the two totals, the thing compared, with each one's door-to-door speed.
     const big = secs => '<b>' + fmtMin(secs).replace(' min', '<span>min</span>') + '</b>';
@@ -1069,7 +1069,12 @@
     $('trip-bike').title = how;
     $('trip-rail').innerHTML = bike.legs.map(leg => '<i class="line ' + leg.type + '"></i>').join('')
       + '<i class="at"></i><div class="end"><b>' + fmtClock(bike.t1) + '</b><strong>' + fmtMin(bike.t1 - plan.t0) + '</strong><small>'
-      + fmtDist(bike.m) + '</small>' + (foot ? '<small>' + foot + '</small>' : '') + (plan.winner === 'bike' ? AWARD : plan.winner === 'tie' ? FRIENDS : '') + '</div>';
+      + fmtDist(bike.m) + '</small>' + (foot ? '<small>' + foot + '</small>' : '') + (plan.winner === 'bike' ? AWARD : '') + '</div>';
+    // A tie's handshake: under the two timelines, across both, and on the phone between
+    // the two lanes where the two runners end.
+    $('trip-friends').innerHTML = plan.winner === 'tie' ? FRIENDS : '';
+    const ends = (plan.t1 + bike.t1) / 2 - plan.t0, whole = Math.max(plan.t1, bike.t1) - plan.t0;
+    $('race-shake').style.left = 'calc(14px + (100% - 114px) * ' + (ends / whole).toFixed(4) + ')';
     $('trip-rail').setAttribute('aria-label', how + ': ' + fmtMin(bike.t1 - plan.t0) + ', there at ' + fmtClock(bike.t1)
       + ', ' + fmtSpeed(plan.direct, bike.t1 - plan.t0) + ' door to door'
       + (foot ? ', ' + foot : '') + (plan.winner === 'bike' ? ', the fastest commuter' : plan.winner === 'tie' ? ', within a minute of the rider: friendship won' : ''));
@@ -1129,12 +1134,15 @@
     $('trip-panel').classList.toggle('won', !!who);
     rider.marker.getElement().classList.toggle('medalled', who === 'rider');
     rider.bikeMarker.getElement().classList.toggle('medalled', who === 'bike');
-    // A tie: one handshake on the map, where the two stand together, and one a lane.
-    rider.marker.getElement().classList.toggle('friends', who === 'tie');
+    // A tie: the two step apart where they have arrived, and shake hands across it.
+    const tie = who === 'tie';
+    $('trip-panel').classList.toggle('friends', tie);
+    rider.destMarker.getElement().classList.toggle('friends', tie);
+    rider.marker.setOffset([tie ? -19 : 0, 0]);
+    rider.bikeMarker.setOffset([tie ? 19 : 0, 0]);
     for (const [id, whose] of [['lane-rider', 'rider'], ['lane-bike', 'bike']]) {
       $(id).classList.toggle('won', who === whose);
       $(id).querySelector('.runner').classList.toggle('medalled', who === whose);
-      $(id).querySelector('.runner').classList.toggle('friends', who === 'tie');
     }
   }
 
