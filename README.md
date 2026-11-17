@@ -34,6 +34,9 @@ every rack in the city, by type and number of spaces.
   changing buses as often as it takes. A floating panel shows the trip: when they leave and
   arrive, which buses they take, and each step with its times: every walk, every wait
   of half a minute or more, and every ride is a step of its own.
+- The panel is headed by the two totals, the rider's and the bicycle's, in the largest
+  type there: how long each took is what is being compared. Under each is its
+  door-to-door speed (see below).
 - A shadow bicycle sets out with the rider, from the same place to the same place at the
   same moment. In the trip panel its line runs down beside the rider's steps, on their
   clock: the steps are rows, not a scale, so each row's time is a mark and the bicycle
@@ -44,8 +47,9 @@ every rack in the city, by type and number of spaces.
   an honest one: its rider walks to the rack nearest the start, rides to the rack
   nearest where they are going, and walks from there. The racks show on the map as
   green dots, the two in use ringed, and the shadow is a walking figure while it walks.
-  Beside the switch is a link to the [Guelph Bike Parking Map](https://guelph.bike/),
-  where the racks come from.
+  The switch sits in one card with the logo and name of the
+  [Guelph Bike Parking Map](https://guelph.bike/), where the racks come from; the logo
+  and name are the link.
 
 ## Run it
 
@@ -114,6 +118,13 @@ same street network at a flat 15 km/h, lights and stops included. "The same rout
 read as the same start, end and leaving time, not the bus's path. It rides anything the
 rider can walk, steps and footpaths included, and knows nothing of hills, one-way
 streets or bike lanes.
+
+**Door-to-door speed**, shown under each total, is the shortest way along the streets
+from start to end divided by the whole time taken, waits, walks and detours included.
+Both are measured over those same metres, not over the way each actually went, so the
+higher speed always belongs to whoever is there first: a bus that goes the long way
+round is not credited for the extra distance. A bicycle ridden door to door shows its
+15 km/h; one parked at racks shows less.
 
 With **Park the bicycle at a rack** switched on, the bicycle is only ridden between two
 racks:

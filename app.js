@@ -435,7 +435,10 @@
 
   // Give a plan its shadow bicycle (again, when the parking switch is thrown mid-trip).
   function setBike(plan, walks) {
-    plan.bike = planBike(walks || tripWalks(plan.from, plan.to), plan.t0);
+    walks = walks || tripWalks(plan.from, plan.to);
+    plan.bike = planBike(walks, plan.t0);
+    // The shortest way by the streets, door to door: the one distance both are timed over.
+    plan.direct = walks.direct.m;
     // Whoever is there first is the fastest commuter, by however little.
     plan.winner = plan.bike.t1 < plan.t1 ? 'bike' : 'rider';
   }
@@ -798,6 +801,14 @@
     return Math.max(1, Math.round(secs / 60)) + ' min';
   }
 
+  // Door-to-door speed: the shortest way by the streets over the whole time taken, the
+  // waits and detours included. The same metres for the rider and the bicycle, so the
+  // one with the higher speed is the one that is there first.
+  function fmtSpeed(m, secs) {
+    const kmh = m / Math.max(1, secs) * 3.6;
+    return (kmh < 9.95 ? kmh.toFixed(1) : Math.round(kmh)) + ' km/h';
+  }
+
   function addRider() {
     const el = document.createElement('div');
     el.className = 'rider';
@@ -924,7 +935,11 @@
     plan.marks = marks;
     rows.push('<li class="arrive"><time>' + fmtClock(plan.t1) + '</time><span>Arrive' + (plan.winner === 'rider' ? ' ' + AWARD : '') + '</span><em></em></li>');
 
-    $('trip-when').innerHTML = fmtClock(plan.t0) + ' → ' + fmtClock(plan.t1) + ' <span>' + fmtMin(total) + '</span>';
+    // The head: the two totals, the thing compared, with each one's door-to-door speed.
+    const big = secs => '<b>' + fmtMin(secs).replace(' min', '<span>min</span>') + '</b>';
+    const over = 'Door to door: ' + fmtDist(plan.direct) + ' by the shortest way along the streets, over the whole trip';
+    const speed = secs => '<u title="' + over + '">' + fmtSpeed(plan.direct, secs) + '</u>';
+    $('trip-when').innerHTML = big(total) + '<small><span>' + fmtClock(plan.t0) + ' → ' + fmtClock(plan.t1) + '</span>' + speed(total) + '</small>';
     $('trip-buses').innerHTML = rides.length
       ? buses.map(leg => badge(net.routes[leg.r])).join('<i>→</i>')
         + '<span>' + (buses.length === 1 ? 'one bus' : buses.length + ' buses, ' + (buses.length - 1) + (buses.length === 2 ? ' change' : ' changes')) + '</span>'
@@ -937,12 +952,13 @@
     const how = bike.afoot ? 'On foot all the way: riding between the two nearest racks would be no quicker'
       : bike.racks ? 'The same trip by bicycle, parked at a rack at each end' : 'The same trip by bicycle';
     const foot = bike.afoot ? 'on foot all the way' : bike.racks ? fmtMin(bike.walkSecs) + ' of it on foot' : '';
-    $('trip-bike').innerHTML = (bike.afoot ? AFOOT : BIKE) + '<b>' + fmtMin(bike.t1 - plan.t0) + '</b>';
+    $('trip-bike').innerHTML = big(bike.t1 - plan.t0) + '<small>' + (bike.afoot ? AFOOT : BIKE) + speed(bike.t1 - plan.t0) + '</small>';
     $('trip-bike').title = how;
     $('trip-rail').innerHTML = bike.legs.map(leg => '<i class="line ' + leg.type + '"></i>').join('')
       + '<i class="at"></i><div class="end"><b>' + fmtClock(bike.t1) + '</b><small>'
       + fmtDist(bike.m) + '</small>' + (foot ? '<small>' + foot + '</small>' : '') + (plan.winner === 'bike' ? AWARD : '') + '</div>';
     $('trip-rail').setAttribute('aria-label', how + ': ' + fmtMin(bike.t1 - plan.t0) + ', there at ' + fmtClock(bike.t1)
+      + ', ' + fmtSpeed(plan.direct, bike.t1 - plan.t0) + ' door to door'
       + (foot ? ', ' + foot : '') + (plan.winner === 'bike' ? ', the fastest commuter' : ''));
     $('trip-panel').hidden = false;
     layoutRail();
