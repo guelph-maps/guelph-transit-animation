@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Guelph Transit proposed network, animated</title>
 <meta name="description" content="Simulated buses on the 34 routes Guelph Transit proposes in its Future Ready Action Plan Update, over a weekday, Saturday or Sunday.">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
@@ -10,7 +10,9 @@
 </head>
 <body>
 <div id="map"></div>
+<p id="tap-hint">Tap the map to race a bus rider against a bicycle</p>
 
+<div id="ui">
 <section id="panel" aria-label="Animation controls">
   <h1>Guelph Transit <span>proposed network</span></h1>
 
@@ -23,7 +25,7 @@
     <button type="button" data-day="sunday">Sunday</button>
   </div>
 
-  <div class="row">
+  <div class="row transport">
     <button type="button" id="play" aria-label="Pause">Pause</button>
     <div class="speed" id="speed" role="radiogroup" aria-label="Speed, in minutes a second">
       <span class="seg">
@@ -33,13 +35,14 @@
       </span>
       <small>min / s</small>
     </div>
+    <button type="button" id="more" aria-expanded="false" aria-controls="panel" aria-label="Legend, bicycle parking and notes">⋯</button>
   </div>
 
   <input type="range" id="time" min="300" max="1560" step="1" value="420" aria-label="Time of day">
   <div class="ticks"><span>5 am</span><span>noon</span><span>7 pm</span><span>2 am</span></div>
 
   <div id="trip">
-    <p id="trip-hint">Drag the figure to a start, then click the map: they go there by bus, leaving at the time shown. A bicycle sets out with them, and whichever is there first gets the medal.</p>
+    <p id="trip-hint">Drag the figure to a start, then <span class="click">click</span><span class="tap">tap</span> the map: they go there by bus, leaving at the time shown. A bicycle sets out with them, and whichever is there first gets the medal.</p>
     <div id="racks">
       <a id="parking-link" href="https://guelph.bike/" target="_blank" rel="noopener" title="Open the Guelph Bike Parking Map, where the racks come from">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#0f766e"/><path d="M5 18.5h14M8.5 18.5V10a3.5 3.5 0 0 1 7 0v8.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -73,10 +76,16 @@
 
 <aside id="trip-panel" aria-label="The rider's trip" hidden>
   <button type="button" id="trip-close" aria-label="Close the trip">×</button>
+  <button type="button" id="trip-expand" aria-expanded="false" aria-controls="trip-lines">Steps</button>
   <p id="trip-status" aria-live="polite"></p>
+  <div id="race">
+    <div class="lane" id="lane-rider"><div class="track"><span class="segs"></span><span class="runner"></span></div><p class="total"></p></div>
+    <div class="lane" id="lane-bike"><div class="track"><span class="segs"></span><span class="runner"></span></div><p class="total"></p></div>
+  </div>
   <div id="trip-head"><p id="trip-when"></p><p id="trip-bike"></p></div>
   <p id="trip-buses"></p>
   <div id="trip-lines"><ol id="trip-steps"></ol><div id="trip-rail"></div></div></aside>
+</div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="app.js"></script>

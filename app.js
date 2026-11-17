@@ -39,6 +39,11 @@
   let map = null;
   let lastWidths = '';
 
+  // A phone: style.css puts everything in one sheet, under the map or (on its side)
+  // beside it. The same query as there.
+  const compact = window.matchMedia('(max-width: 640px), (max-height: 500px) and (max-width: 1000px)');
+  let sheetH = -1;
+
   // ---------- geometry ----------
 
   function haversine(a, b) {
@@ -758,8 +763,36 @@
   function fitNetwork() {
     const bounds = new maplibregl.LngLatBounds();
     for (const route of net.routes) for (const dir of route.dirs) for (const s of dir.stops) bounds.extend([s.lon, s.lat]);
-    const narrow = window.matchMedia('(max-width: 640px)').matches;
-    map.fitBounds(bounds, { padding: narrow ? 24 : { top: 40, bottom: 40, right: 40, left: 340 }, animate: false });
+    layoutSheet();
+    map.fitBounds(bounds, { padding: compact.matches ? 24 : { top: 40, bottom: 40, right: 40, left: 340 }, animate: false });
+  }
+
+  // On a phone the map ends where the sheet begins, as tall as the sheet is closed: an
+  // opened sheet lies over the map and does not move it.
+  function layoutSheet() {
+    const root = document.documentElement;
+    let h = 0;
+    if (compact.matches) {
+      if ($('panel').classList.contains('open') || $('trip-panel').classList.contains('open')) return;
+      const ui = $('ui');
+      h = ui.offsetWidth < root.clientWidth ? 0 : ui.offsetHeight;   // beside the map, nothing is under it
+    }
+    if (h === sheetH) return;
+    sheetH = h;
+    if (compact.matches) root.style.setProperty('--sheet-h', h + 'px'); else root.style.removeProperty('--sheet-h');
+    if (map) map.resize();
+  }
+
+  // Open or close one of the sheet's two folds: 'panel' (the legend, the racks, the
+  // notes) or 'trip-panel' (the steps). Only one is open at a time.
+  function setOpen(id, on) {
+    for (const [fold, button] of [['panel', 'more'], ['trip-panel', 'trip-expand']]) {
+      const open = fold === id && on;
+      $(fold).classList.toggle('open', open);
+      $(button).setAttribute('aria-expanded', open);
+    }
+    if (id === 'trip-panel' && on) { rider.step = null; layoutRail(); }   // the rows were not laid out while hidden
+    layoutSheet();
   }
 
   // ---------- UI ----------
@@ -845,6 +878,9 @@
     bike.title = 'The same trip by bicycle';
     bike.innerHTML = BIKE + AFOOT + PIN;
     rider.bikeMarker = new maplibregl.Marker({ element: bike, anchor: 'bottom' });
+    // The same two on the lanes of the phone's race.
+    $('lane-rider').querySelector('.runner').innerHTML = FIGURE + PIN;
+    $('lane-bike').querySelector('.runner').innerHTML = BIKE + AFOOT + PIN;
 
     const dest = document.createElement('div');
     dest.className = 'dest';
@@ -871,12 +907,15 @@
     map.getSource('trip').setData(tripFeatures(null));
     $('trip-steps').innerHTML = '';
     $('trip-panel').hidden = true;
+    document.body.classList.remove('racing');
+    setOpen('trip-panel', false);
   }
 
   function sendRider(to) {
     const from = rider.plan ? riderAt(rider.plan, state.t).pos : rider.pos;
     if (haversine(from, to) < 15) return;
     rider.pos = from;
+    setOpen('panel', false);
     rider.plan = planTrip(from, to, state.t, state.day);
     rider.step = null;
     rider.destMarker.setLngLat(to).addTo(map);
@@ -892,17 +931,16 @@
   function showTrip(plan) {
     const pts = tripFeatures(plan).features.flatMap(f => f.geometry.type === 'LineString' ? f.geometry.coordinates : []);
     const box = map.getContainer().getBoundingClientRect(), tp = $('trip-panel').getBoundingClientRect();
-    const narrow = window.matchMedia('(max-width: 640px)').matches;
-    const pad = narrow ? { top: tp.bottom - box.top + 44, bottom: 30, left: 30, right: 50 }
+    const pad = compact.matches ? { top: 44, bottom: 28, left: 30, right: 30 }
       : { top: 56, bottom: 40, left: 340, right: box.width >= 1000 ? box.right - tp.left + 30 : 60 };
     const clear = pts.every(p => {
       const q = map.project(p);
       return q.x >= pad.left - 10 && q.x <= box.width - pad.right + 10 && q.y >= pad.top - 10 && q.y <= box.height - pad.bottom + 10;
     });
-    if (clear) return;
+    if (clear && !compact.matches) return;   // a phone's map is small: there the trip always fills it
     const bounds = new maplibregl.LngLatBounds();
     for (const p of pts) bounds.extend(p);
-    map.fitBounds(bounds, { padding: pad, maxZoom: Math.max(map.getZoom(), 14), duration: 600 });
+    map.fitBounds(bounds, { padding: pad, maxZoom: Math.max(map.getZoom(), compact.matches ? 15 : 14), duration: 600 });
   }
 
   function badge(route) {
@@ -977,7 +1015,25 @@
     $('trip-rail').setAttribute('aria-label', how + ': ' + fmtMin(bike.t1 - plan.t0) + ', there at ' + fmtClock(bike.t1)
       + ', ' + fmtSpeed(plan.direct, bike.t1 - plan.t0) + ' door to door'
       + (foot ? ', ' + foot : '') + (plan.winner === 'bike' ? ', the fastest commuter' : ''));
+    // On a phone, the race: two lanes on one clock, from setting out to the later arrival.
+    const span = Math.max(plan.t1, bike.t1) - plan.t0;
+    const pct = secs => (secs / span * 100).toFixed(2) + '%';
+    const seg = (cls, a, b, color) => '<i class="' + cls + '" style="left:' + pct(a - plan.t0) + ';width:' + pct(b - a)
+      + (color ? ';background:' + color : '') + '"></i>';
+    const lane = (id, legs, t1, label) => {
+      const el = $(id);
+      el.querySelector('.segs').innerHTML = seg('base', plan.t0, t1)
+        + legs.map(leg => seg(leg.type, leg.t0, leg.t1, leg.r === undefined ? '' : net.routes[leg.r].color)).join('')
+        + '<i class="fin" style="left:' + pct(t1 - plan.t0) + '"></i>';
+      el.querySelector('.total').innerHTML = big(t1 - plan.t0) + '<small>' + fmtSpeed(plan.direct, t1 - plan.t0) + '</small>';
+      el.setAttribute('aria-label', label + ': ' + fmtMin(t1 - plan.t0) + ', there at ' + fmtClock(t1));
+    };
+    lane('lane-rider', plan.legs, plan.t1, rides.length ? 'By bus' : 'On foot');
+    lane('lane-bike', bike.legs, bike.t1, how);
+    plan.span = span;
     $('trip-panel').hidden = false;
+    document.body.classList.add('racing');
+    layoutSheet();
     layoutRail();
   }
 
@@ -1015,6 +1071,10 @@
     $('trip-panel').classList.toggle('won', !!who);
     rider.marker.getElement().classList.toggle('medalled', who === 'rider');
     rider.bikeMarker.getElement().classList.toggle('medalled', who === 'bike');
+    for (const [id, whose] of [['lane-rider', 'rider'], ['lane-bike', 'bike']]) {
+      $(id).classList.toggle('won', who === whose);
+      $(id).querySelector('.runner').classList.toggle('medalled', who === whose);
+    }
   }
 
   function renderRider() {
@@ -1025,7 +1085,12 @@
     if (shadow.afoot !== rider.afoot) {
       rider.afoot = shadow.afoot;
       rider.bikeMarker.getElement().classList.toggle('afoot', shadow.afoot);
+      $('lane-bike').querySelector('.runner').classList.toggle('afoot', shadow.afoot);
     }
+    // The two runners of the phone's race, each as far along as its clock.
+    const plan = rider.plan, along = t1 => (Math.min(Math.max(state.t, plan.t0), t1) - plan.t0) / plan.span * 100 + '%';
+    $('lane-rider').querySelector('.runner').style.left = along(plan.t1);
+    $('lane-bike').querySelector('.runner').style.left = along(bike.t1);
     if (rider.rail) rider.rail.at.style.transform = 'translateY(' + rider.rail.yAt(Math.min(state.t, bike.t1)) + 'px)';
     // The medal is won on arriving, and lost again if the clock is dragged back.
     const awarded = rider.plan.winner && state.t >= Math.min(rider.plan.t1, bike.t1) ? rider.plan.winner : null;
@@ -1041,7 +1106,8 @@
     [...$('trip-steps').children].forEach((li, i) => {
       li.classList.toggle('done', i < step);
       li.classList.toggle('now', i === step);
-      if (i === step) li.scrollIntoView({ block: 'nearest' });   // the panel scrolls on a phone
+      // The steps scroll on a phone, where they are only there once opened.
+      if (i === step && (!compact.matches || $('trip-panel').classList.contains('open'))) li.scrollIntoView({ block: 'nearest' });
     });
     layoutRail();   // the row now in bold may have wrapped, and moved the rows below it
   }
@@ -1079,6 +1145,12 @@
     });
     $('play').addEventListener('click', () => setPlaying(!state.playing));
     $('trip-close').addEventListener('click', () => clearTrip());
+    $('more').addEventListener('click', () => setOpen('panel', !$('panel').classList.contains('open')));
+    $('trip-expand').addEventListener('click', () => setOpen('trip-panel', !$('trip-panel').classList.contains('open')));
+    // The sheet's height sets where the map ends; turning the phone closes what was open.
+    for (const id of ['panel', 'trip-panel']) new ResizeObserver(layoutSheet).observe($(id));
+    compact.addEventListener('change', () => { sheetH = -1; setOpen('panel', false); });
+    window.addEventListener('resize', layoutSheet);
     $('parking').addEventListener('change', e => setParking(e.target.checked));
     $('speed').addEventListener('change', e => { state.speed = +e.target.value; });
     $('time').addEventListener('input', e => { state.t = +e.target.value * 60; render(); });
@@ -1146,7 +1218,7 @@
     paintLegend(net.routes);
     fitNetwork();
     addLayers();
-    bindHover();
+    if (window.matchMedia('(hover: hover)').matches) bindHover();   // a finger does not hover: its tap sends the rider
     addRider();
     render();
     loop();

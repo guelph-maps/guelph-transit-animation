@@ -11,6 +11,8 @@
 html, body {
   height: 100%;
   margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
   font: 14px/1.4 system-ui, "Segoe UI", Roboto, sans-serif;
   color: var(--ink);
   background: #eef0f2;
@@ -208,25 +210,155 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .pop div + div { margin-top: 3px; }
 .pop .off { color: var(--muted); }
 
-@media (max-width: 640px) {
-  #map { bottom: 44%; }
-  #panel {
-    top: auto;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 44%;
-    max-height: none;
-    border-radius: 12px 12px 0 0;
-    border-width: 1px 0 0;
-    padding: 10px 16px 14px;
-  }
-  /* The panel is short here, but the bicycle's time heads its column, above the fold. */
-  #trip-panel { top: 8px; left: 8px; right: 48px; width: auto; max-height: 27%; padding: 8px 12px; --bike-col: 96px; }
-  #trip-bike { padding-left: 6px; }
-  #trip-head { margin: 0 0 3px; }
-  #trip-head b { font-size: 21px; }
-  #trip-buses { margin-bottom: 4px; }
-  #clock-time { font-size: 26px; }
-  h1 span { display: inline; }
+/* ---------- small screens ----------
+   On a wide screen the wrapper is not there, and these are only seen on a small one. */
+#ui { display: contents; }
+#more, #trip-expand, #race, #tap-hint, #trip-hint .tap { display: none; }
+@media (pointer: coarse) {
+  #trip-hint .click { display: none; }
+  #trip-hint .tap { display: inline; }
 }
+
+/* A phone, upright or on its side: one sheet holds everything, and the map has the
+   rest. The sheet is short: the clock and its controls, and above them, once a trip is
+   made, the race. What else there is opens over the map. COMPACT in app.js is this query. */
+@media (max-width: 640px), (max-height: 500px) and (max-width: 1000px) {
+  #map { bottom: var(--sheet-h, 170px); }
+  .maplibregl-ctrl-top-right { display: none; }   /* a phone zooms with two fingers */
+
+  #ui {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;   /* over the map's own controls, when it is opened over the map */
+    display: flex;
+    flex-direction: column;
+    max-height: 88%;
+    max-height: 88dvh;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--paper);
+    border-top: 1px solid var(--rule);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -2px 12px rgb(0 0 0 / 0.12);
+    overflow: hidden;
+  }
+  #panel, #trip-panel {
+    position: relative;
+    inset: auto;
+    width: auto;
+    max-height: none;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: none;
+    overflow-y: auto;
+  }
+
+  /* The controls: play, the clock, the speed and "more" in one row, then the days and
+     the time of day. The rest waits behind "more". */
+  #panel { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 6px 8px; flex: 0 1 auto; padding: 8px 12px 10px; }
+  #panel > * { flex: 0 0 100%; order: 5; margin: 0; }
+  #panel .transport { display: contents; }
+  #play, #more { flex: 0 0 44px; height: 40px; padding: 0; }
+  #play { order: 0; min-width: 0; font-size: 0; }
+  #play::before { font-size: 15px; content: "\25B6"; }
+  #play[aria-label="Pause"]::before { content: "\275A\275A"; font-size: 12px; letter-spacing: 1px; }
+  #clock { order: 1; flex: 1 1 0; min-width: 0; flex-direction: column; align-items: flex-start; gap: 0; }
+  #clock-time { font-size: 24px; line-height: 1.05; }
+  #clock-day { max-width: 100%; font-size: 11.5px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #speed { order: 1; flex: none; margin-left: 0; flex-direction: column; gap: 0; }
+  #speed small { font-size: 10px; line-height: 1.1; }
+  .seg label span { min-width: 36px; padding: 4px 0; }
+  #more { order: 1; display: block; font-size: 20px; line-height: 1; color: var(--muted); }
+  #more[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  #days { order: 2; }
+  #days button { padding: 8px 4px; }
+  #time { order: 3; height: 26px; }
+  #panel > .ticks { order: 4; margin-top: -6px; }
+  #panel:not(.open) > :is(h1, #count, #trip, #legend, .fine) { display: none; }
+  #panel:not(.open), #trip-panel:not(.open) { flex: none; }   /* the closed one keeps its height; the open one scrolls */
+  #panel.open > h1 { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--rule); }
+  #panel.open > #trip { padding: 0; border: 0; }
+  #panel.open > #legend { margin-top: 2px; }
+  h1 span { display: inline; }
+  /* While they race, the days and the scale under the slider make way. */
+  .racing #panel:not(.open) > :is(#days, .ticks) { display: none; }
+
+  /* The race: above the controls, the same sheet. */
+  #trip-panel { order: -1; flex: 0 1 auto; padding: 4px 12px 8px; border-bottom: 1px solid var(--rule); --bike-col: 96px; }
+  #trip-status { min-height: 34px; padding-right: 132px; line-height: 34px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #trip-close { top: 2px; right: 4px; width: 40px; height: 34px; padding: 0 0 3px; font-size: 24px; background: none; }
+  #trip-expand { display: block; position: absolute; top: 5px; right: 50px; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12.5px; color: var(--muted); }
+  #trip-expand::after { content: " \25BE"; }
+  #trip-expand[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  #trip-expand[aria-expanded="true"]::after { content: " \25B4"; }
+  #trip-head { display: none; }
+  #trip-panel #trip-buses { margin: 10px 0 0; }
+  #trip-lines { display: none; margin-top: 8px; }
+  #trip-panel.open #trip-lines { display: grid; }
+  #trip-bike { padding-left: 6px; }
+
+  /* Two lanes on one clock, from setting out to the later of the two arrivals. Each
+     runner moves along its own line: dotted on foot, solid riding (a bus in its route's
+     colour), bare while waiting, with a post where it ends. */
+  #race { display: block; }
+  .lane { display: grid; grid-template-columns: minmax(0, 1fr) 76px; align-items: end; gap: 12px; }
+  .lane + .lane { margin-top: 6px; }
+  .track { position: relative; height: 30px; margin: 0 12px 0 14px; }
+  .segs i { position: absolute; bottom: 0; height: 5px; border-radius: 2.5px; background: #7a8494; }
+  .segs i.base { bottom: 2px; height: 1px; border-radius: 0; background: #c5ccd6; }
+  .segs i.walk { border-radius: 0; background: repeating-linear-gradient(90deg, #7a8494 0 3px, transparent 3px 7px); }
+  .segs i.fin { bottom: 0; width: 2px; height: 11px; margin-left: -1px; border-radius: 0; background: var(--ink); }
+  .runner { position: absolute; bottom: 6px; left: 0; transform: translateX(-50%); }
+  .runner > svg { display: block; width: 100%; height: 100%; }
+  #lane-rider .runner { width: 14px; height: 21px; }
+  #lane-rider .runner > svg, #lane-bike .runner > svg.foot { fill: var(--ink); stroke: #fff; stroke-width: 1.5; paint-order: stroke; }
+  #lane-bike .runner { width: 27px; height: 18px; }
+  #lane-bike .runner > svg { fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  #lane-bike .runner > svg.foot { display: none; }
+  #lane-bike .runner.afoot { width: 14px; height: 21px; }
+  #lane-bike .runner > svg.foot { opacity: 0.6; }
+  #lane-bike .runner.afoot > svg { display: none; }
+  #lane-bike .runner.afoot > svg.foot { display: block; }
+  .runner .medal { top: -7px; right: -11px; width: 13px; height: 18px; }
+  #lane-bike .runner:not(.afoot) .medal { top: -11px; right: -7px; }
+  .total { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 4px; line-height: 1.1; }
+  .total b { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.4px; white-space: nowrap; }
+  .total b span { margin-left: 2px; font-size: 12px; font-weight: 600; letter-spacing: 0; }
+  .total small { flex: 0 0 100%; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .lane.won .total b { color: #8a5d00; }
+
+  /* What to do, said on the map until it is done. */
+  #tap-hint {
+    display: block;
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100% - 16px);
+    margin: 0;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgb(28 35 48 / 0.88);
+    color: #fff;
+    font-size: 12.5px;
+    line-height: 1.25;
+    text-align: center;
+    pointer-events: none;
+  }
+  .racing #tap-hint { display: none; }
+
+  /* A finger is wider than the figure. */
+  .rider::after { content: ""; position: absolute; inset: -12px -14px -8px; }
+}
+
+/* On its side a phone is too short for a sheet under the map: it stands beside it. */
+@media (max-height: 500px) and (min-width: 641px) and (max-width: 1000px) {
+  #map { left: 320px; bottom: 0; }
+  #ui { top: 0; right: auto; width: 320px; max-height: none; padding-left: env(safe-area-inset-left); border-top: 0; border-right: 1px solid var(--rule); border-radius: 0; box-shadow: 2px 0 12px rgb(0 0 0 / 0.12); }
+  #tap-hint { left: calc(320px + (100% - 320px) / 2); max-width: calc(100% - 336px); }
+}
+
