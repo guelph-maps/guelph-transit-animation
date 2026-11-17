@@ -26,8 +26,8 @@ Live: https://guelph-maps.github.io/guelph-transit-animation/
 - A rider stands on the map. Drag the figure to a start, click anywhere, and they travel
   there by bus from the time shown: walking to a stop, waiting, riding the simulated bus,
   changing buses as often as it takes. A floating panel shows the trip: when they leave and
-  arrive, which buses they take, each step with its times, and how long they spend
-  walking, waiting and riding.
+  arrive, which buses they take, and each step with its times: every walk, every wait
+  of half a minute or more, and every ride is a step of its own.
 - A shadow bicycle sets out with the rider, from the same place to the same place at the
   same moment. In the trip panel its line runs down beside the rider's steps, on their
   clock: the steps are rows, not a scale, so each row's time is a mark and the bicycle

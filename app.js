@@ -783,8 +783,8 @@
     return m < 950 ? Math.max(10, Math.round(m / 10) * 10) + ' m' : (m / 1000).toFixed(1) + ' km';
   }
 
-  // The floating trip panel: when, which buses, each step with its times, and how the
-  // time splits into walking, waiting and riding. One <li> per leg, then the arrival.
+  // The floating trip panel: when, which buses, and each step with its times. One <li>
+  // per walk, wait and ride, then the arrival.
   function renderSteps(plan) {
     const rides = plan.legs.filter(leg => leg.type === 'ride');
     // A bus that reaches its terminus lays over and comes back as the other direction;
@@ -797,23 +797,29 @@
     };
     const buses = plan.legs.filter((leg, j) => leg.type === 'ride' && !sameBus(leg, j));
     const total = plan.t1 - plan.t0;
-    let walk = 0, wait = 0, ride = 0;
-    const rows = plan.legs.map((leg, j) => {
+    // One row per thing the rider does: a walk, a wait of half a minute or more, a ride.
+    // `marks` keeps each row's stamped time and when it is over, for the row now under
+    // way and for the bicycle's line beside them.
+    const rows = [], marks = [];
+    const row = (cls, t0, t1, what, notes) => {
+      marks.push({ t: t0, t1 });
+      rows.push('<li class="' + cls + '"><time>' + fmtClock(t0) + '</time><span>' + what
+        + notes.map(s => '<small>' + s + '</small>').join('') + '</span><em>' + fmtMin(t1 - t0) + '</em></li>');
+    };
+    plan.legs.forEach((leg, j) => {
       if (leg.type === 'walk') {
-        walk += leg.t1 - leg.t0;
-        return '<li class="walk"><time>' + fmtClock(leg.t0) + '</time><span>Walk to ' + (leg.to ? esc(leg.to) : 'where you clicked')
-          + '<small>' + fmtDist(leg.m) + '</small></span><em>' + fmtMin(leg.t1 - leg.t0) + '</em></li>';
+        row('walk', leg.t0, leg.t1, 'Walk to ' + (leg.to ? esc(leg.to) : 'where you clicked'), [fmtDist(leg.m)]);
+        return;
       }
       const route = net.routes[leg.r], dir = route.dirs[leg.di];
-      const waited = leg.t0 - leg.ready, n = leg.i1 - leg.i0;
-      wait += waited;
-      ride += leg.t1 - leg.t0;
-      return '<li class="ride"><time>' + fmtClock(leg.t0) + '</time><span>' + badge(route) + ' ' + esc(route.name)
-        + '<small>' + (sameBus(leg, j) ? 'Same bus, after ' + fmtMin(waited) + ' at the terminus'
-          : (waited >= 30 ? 'Wait ' + fmtMin(waited) + ' at ' : 'Board at ') + esc(dir.stops[leg.i0].name)) + '</small>'
-        + '<small>Off at ' + esc(dir.stops[leg.i1].name) + ', ' + fmtClock(leg.t1) + ' · ' + n + (n === 1 ? ' stop' : ' stops') + '</small>'
-        + '</span><em>' + fmtMin(leg.t1 - leg.t0) + '</em></li>';
+      const n = leg.i1 - leg.i0, at = esc(dir.stops[leg.i0].name), stay = sameBus(leg, j);
+      const waits = leg.t0 - leg.ready >= 30;
+      if (waits) row('wait', leg.ready, leg.t0, stay ? 'Stay on the ' + esc(route.id) + ' at its terminus' : 'Wait for the ' + esc(route.id), [at]);
+      row('ride', leg.t0, leg.t1, badge(route) + ' ' + esc(route.name), (waits ? [] : [(stay ? 'Same bus, from ' : 'Board at ') + at])
+        .concat('Off at ' + esc(dir.stops[leg.i1].name) + ', ' + fmtClock(leg.t1) + ' · ' + n + (n === 1 ? ' stop' : ' stops')));
     });
+    marks.push({ t: plan.t1, t1: Infinity });
+    plan.marks = marks;
     rows.push('<li class="arrive"><time>' + fmtClock(plan.t1) + '</time><span>Arrive' + (plan.winner === 'rider' ? ' ' + AWARD : '') + '</span><em></em></li>');
 
     $('trip-when').innerHTML = fmtClock(plan.t0) + ' → ' + fmtClock(plan.t1) + ' <span>' + fmtMin(total) + '</span>';
@@ -822,9 +828,6 @@
         + '<span>' + (buses.length === 1 ? 'one bus' : buses.length + ' buses, ' + (buses.length - 1) + (buses.length === 2 ? ' change' : ' changes')) + '</span>'
       : '<span>' + (plan.noBus && total > WALK_ALL_MAX ? 'No bus gets there from here at this hour, so they walk.' : 'On foot: no bus is quicker.') + '</span>';
     $('trip-steps').innerHTML = rows.join('');
-    const parts = [['walk', 'Walking', walk], ['wait', 'Waiting', wait], ['ride', 'On the bus', ride]].filter(p => p[2] >= 30);
-    $('trip-split').innerHTML = parts.map(p => '<i class="' + p[0] + '" style="flex-grow:' + Math.round(p[2]) + '"></i>').join('');
-    $('trip-totals').innerHTML = parts.map(p => '<span class="' + p[0] + '">' + p[1] + ' <b>' + fmtMin(p[2]) + '</b></span>').join('');
     // The bicycle's own timeline, beside the steps and on their clock: one line from
     // setting out to arriving, with a dot that rides down it.
     const bike = plan.bike;
@@ -845,7 +848,7 @@
   function layoutRail() {
     const plan = rider.plan, rail = $('trip-rail');
     if (!plan || !rail.firstChild) return;
-    const marks = [...$('trip-steps').children].map((li, i) => ({ t: i < plan.legs.length ? plan.legs[i].t0 : plan.t1, y: li.offsetTop + 14 }));
+    const marks = [...$('trip-steps').children].map((li, i) => ({ t: plan.marks[i].t, y: li.offsetTop + 14 }));
     const first = marks[0], last = marks[marks.length - 1];
     const pace = last.t > first.t ? (last.y - first.y) / (last.t - first.t) : 0;   // px a second, past the last row
     const yAt = t => {
@@ -884,12 +887,14 @@
     const status = at.step < 0 ? 'Setting out' : at.step >= legs ? 'Arrived'
       : leg.type === 'walk' ? 'Walking' : state.t < leg.t0 ? 'Waiting for the ' + net.routes[leg.r].id : 'On the ' + net.routes[leg.r].id;
     if ($('trip-status').textContent !== status) $('trip-status').textContent = status;
-    if (at.step === rider.step) return;
-    rider.step = at.step;
+    // The row under way: the first one not yet over (-1 before setting out).
+    const step = at.step < 0 ? -1 : rider.plan.marks.findIndex(m => state.t < m.t1);
+    if (step === rider.step) return;
+    rider.step = step;
     [...$('trip-steps').children].forEach((li, i) => {
-      li.classList.toggle('done', i < at.step);
-      li.classList.toggle('now', i === at.step);
-      if (i === at.step) li.scrollIntoView({ block: 'nearest' });   // the panel scrolls on a phone
+      li.classList.toggle('done', i < step);
+      li.classList.toggle('now', i === step);
+      if (i === step) li.scrollIntoView({ block: 'nearest' });   // the panel scrolls on a phone
     });
     layoutRail();   // the row now in bold may have wrapped, and moved the rows below it
   }

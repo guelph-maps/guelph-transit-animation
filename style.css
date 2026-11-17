@@ -92,7 +92,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 #trip-buses .badge + span, #trip-buses .badge ~ span { margin-left: 4px; }
 .badge { display: inline-block; min-width: 26px; padding: 0 5px; border-radius: 4px; color: #fff; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
 
-#trip-lines { position: relative; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+#trip-lines { position: relative; border-top: 1px solid var(--rule); }
 #trip-steps { list-style: none; margin: 0; padding: 6px 0; }
 #trip-steps li { display: flex; gap: 8px; padding: 4px 0 4px 6px; border-left: 3px solid transparent; }
 #trip-steps time { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); }
@@ -103,15 +103,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 #trip-steps li.now { border-left-color: var(--ink); background: #f3f5f7; }
 #trip-steps li.now > span { font-weight: 600; }
 #trip-steps li.now small { font-weight: 400; }
-
-#trip-split { display: flex; gap: 2px; height: 6px; margin: 10px 0 6px; }
-#trip-split i { flex: 1 1 0; min-width: 4px; border-radius: 3px; }
-#trip-split .walk, #trip-totals .walk::before { background: #8a94a3; }
-#trip-split .wait, #trip-totals .wait::before { background: #d9dee5; }
-#trip-split .ride, #trip-totals .ride::before { background: var(--ink); }
-#trip-totals { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; color: var(--muted); }
-#trip-totals span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; }
-#trip-totals b { color: var(--ink); font-variant-numeric: tabular-nums; }
+#trip-steps li.wait > span { color: var(--muted); }
 
 .rider { width: 26px; height: 38px; cursor: grab; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.45)); }
 .rider:active { cursor: grabbing; }
