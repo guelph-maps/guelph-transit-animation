@@ -33,8 +33,7 @@ Live: https://guelph-maps.github.io/guelph-transit-animation/
   clock: the steps are rows, not a scale, so each row's time is a mark and the bicycle
   ends between the two rows it arrives between.
 - Whichever of the two is there first gets the fastest commuter's medal as it arrives,
-  in the panel and on the map. Less than 30 seconds apart is a dead heat, and nobody
-  gets it.
+  in the panel and on the map, by however little.
 
 ## Run it
 
@@ -219,8 +218,8 @@ Run in the browser console (`window.sim` exposes the simulation):
 - The medal and the bicycle's line were looked at on one trip the bus wins (the bicycle
   ends just below the Arrive row) and one the bicycle wins (it ends between the rows
   stamped 10:00 and 10:13, at 10:10). The medal goes when the clock is dragged back
-  before the arrival and when the day changes. A dead heat and a bicycle far behind the
-  bus were not looked at.
+  before the arrival and when the day changes. A walk of 300 m was looked at too. A
+  bicycle far behind the bus was not.
 
 ## Not done
 

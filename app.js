@@ -27,7 +27,6 @@
   const TRANSFER_SLACK = 60;      // s needed at a stop before boarding the next bus
   const BOARD_PENALTY = 180;      // s a boarding must save to be worth making
   const MAX_BOARDINGS = 5;
-  const TIE = 30;                 // s: arrivals this close are a dead heat, and nobody gets the medal
 
   const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 300 };
   const rider = { pos: null, plan: null, marker: null, bikeMarker: null, destMarker: null, step: null, draggedAt: 0, rail: null, awarded: null };
@@ -401,9 +400,8 @@
     // by the streets.
     const line = walks.direct.line;
     plan.bike = { line, cum: measure(line), m: walks.direct.m, t1: t0 + walks.direct.m / BIKE_SPEED };
-    // Whoever is there first is the fastest commuter; within TIE seconds, nobody is.
-    const ahead = plan.t1 - plan.bike.t1;
-    plan.winner = Math.abs(ahead) < TIE ? null : ahead > 0 ? 'bike' : 'rider';
+    // Whoever is there first is the fastest commuter, by however little.
+    plan.winner = plan.bike.t1 < plan.t1 ? 'bike' : 'rider';
     return plan;
   }
 
