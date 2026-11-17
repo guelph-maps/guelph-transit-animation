@@ -17,6 +17,8 @@
   const WALK_SPEED = 4.8 / 3.6;   // m/s
   const WALK_DETOUR = 1.3;
   const ACCESS_MARGIN = 400;      // m: the rider uses the nearest stop, or one up to this much farther
+  const NEAR_MARGIN = 100;        // m: stops this close to the nearest one count as the nearest
+  const FAR_STOP_GAIN = 60;       // s sooner a trip must arrive to start at a stop farther than those
   const WALK_ALL_MAX = 15 * 60;   // s: the longest trip the rider will walk when a bus could do it
   const WALK_ALL_RATIO = 1.5;     // ...unless the buses would take this many times as long
   const TRANSFER_RADIUS = 400;    // m, straight line, between stops when changing buses
@@ -174,20 +176,32 @@
   }
 
   // Seconds on foot between a point and each stop the rider would use from there: the
-  // nearest one and any up to ACCESS_MARGIN farther (the stop across the street, the
-  // other route round the corner). Infinity for the rest.
-  function stopsNear(p) {
+  // nearest one and any up to `margin` farther (the stop across the street, the other
+  // route round the corner). Infinity for the rest.
+  function stopsNear(p, margin) {
     const stops = net.ustops, d = stops.map(s => haversine(p, s.pos));
-    const limit = Math.min(...d) + ACCESS_MARGIN;
+    const limit = Math.min(...d) + margin;
     return Float64Array.from(d, m => m <= limit ? m * WALK_DETOUR / WALK_SPEED : Infinity);
   }
 
-  // Earliest arrival from `from` to `to` leaving at `t0`, in rounds of one more boarding
-  // each (RAPTOR). The rider walks only to the stops near the start, between nearby stops
-  // to change buses, and from the stops near the end. Returns the legs, with their times.
+  // The trip from `from` to `to` leaving at `t0`. The rider starts at the nearest stop
+  // unless a farther one gets them there sooner: walking past it to the line they would
+  // change to anyway, only to board the same bus, is not what people do.
   function planTrip(from, to, t0, day) {
+    const near = planFrom(from, to, t0, day, NEAR_MARGIN);
+    const far = planFrom(from, to, t0, day, ACCESS_MARGIN);
+    // If the nearest stop has no bus worth taking, the wider plan decides whether to walk.
+    const rides = near.legs.some(leg => leg.type === 'ride');
+    return !rides || far.t1 <= near.t1 - FAR_STOP_GAIN ? far : near;
+  }
+
+  // Earliest arrival from `from` to `to` leaving at `t0`, in rounds of one more boarding
+  // each (RAPTOR). The rider walks only to the stops near the start (up to `margin`
+  // farther than the nearest), between nearby stops to change buses, and from the stops
+  // near the end. Returns the legs, with their times.
+  function planFrom(from, to, t0, day, margin) {
     const stops = net.ustops, n = stops.length;
-    const access = stopsNear(from), egress = stopsNear(to);
+    const access = stopsNear(from, margin), egress = stopsNear(to, ACCESS_MARGIN);
     const best = new Float64Array(n);
     let prev = new Float64Array(n);
     const how = [new Array(n)];             // how[k][u]: what brought the rider to u in round k
@@ -684,7 +698,7 @@
     render();
     loop();
     // For checking the simulation from the console.
-    window.sim = { net, map, state, rider, busesAt, tripTimes, headwayAt, render, planTrip, riderAt, sendRider, clearTrip };
+    window.sim = { net, map, state, rider, busesAt, tripTimes, headwayAt, render, planTrip, planFrom, riderAt, sendRider, clearTrip };
   }
 
   start().catch(err => {

@@ -65,10 +65,12 @@ time shown (a RAPTOR search, up to five boardings), under these assumptions:
 
 - **Walking is a straight line** at 4.8 km/h, with distances multiplied by 1.3 for the
   streets not being straight.
-- **The rider walks to the nearest stop**, or to one up to 400 m farther in a straight
-  line (the stop across the street, the other route round the corner), and the same from
-  the bus to where they are going. Between buses they walk up to 400 m.
-  Everything else is done by bus, with as many changes as it takes.
+- **The rider walks to the nearest stop** (or one within 100 m of it, the stop across
+  the street). They start at one up to 400 m farther in a straight line, the other route
+  round the corner, only if that gets them there at least a minute sooner: not to board
+  the bus they would have changed to anyway. From the bus to where they are going they
+  walk from the nearest stop or one up to 400 m farther. Between buses they walk up to
+  400 m. Everything else is done by bus, with as many changes as it takes.
 - **A change needs 60 s** at the stop, and a boarding has to save 3 minutes to be worth
   making.
 - **Walking the whole way** happens when no bus gets there at that hour, when it takes
