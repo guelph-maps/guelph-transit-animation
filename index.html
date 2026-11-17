@@ -80,5 +80,20 @@
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="app.js"></script>
+<script>
+// Visits are counted on the public site only (GoatCounter: no cookies, nothing personal),
+// in the same counter as the Guelph Bike Parking Map, under this project's own path.
+// Not on localhost, and not inside someone else's page.
+(function () {
+  var framed; try { framed = window.self !== window.top; } catch (e) { framed = true; }
+  if (location.hostname !== 'guelph-maps.github.io' || framed) return;
+  var counter = document.createElement('script');
+  counter.dataset.goatcounter = 'https://osm-guelph.goatcounter.com/count';
+  counter.dataset.goatcounterSettings = JSON.stringify({ path: '/guelph-transit-animation/' });
+  counter.async = true;
+  counter.src = 'https://gc.zgo.at/count.js';   // no SRI hash: the script changes over time
+  document.head.appendChild(counter);
+})();
+</script>
 </body>
 </html>

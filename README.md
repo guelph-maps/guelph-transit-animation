@@ -68,6 +68,10 @@ python -m http.server 8765
 and open http://localhost:8765. MapLibre GL JS is loaded from unpkg and the basemap from
 OpenFreeMap (no key).
 
+Visits to the live site are counted with [GoatCounter](https://www.goatcounter.com/)
+(no cookies), in the counter the Guelph Bike Parking Map uses, under the path
+`/guelph-transit-animation/`. Nothing is counted on localhost or inside a frame.
+
 ## How the simulation works, and what it assumes
 
 The city has published frequencies, not timetables, so every bus position is made up
