@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guelph Transit proposed network, animated</title>
+<meta name="description" content="Simulated buses on the 34 routes Guelph Transit proposes in its Future Ready Action Plan Update, over a weekday, Saturday or Sunday.">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="map"></div>
+
+<section id="panel" aria-label="Animation controls">
+  <h1>Guelph Transit <span>proposed network</span></h1>
+
+  <div id="clock" aria-live="off"><span id="clock-time">--:--</span><span id="clock-day"></span></div>
+  <p id="count">Loading…</p>
+
+  <div class="row" role="group" aria-label="Day of week" id="days">
+    <button type="button" data-day="weekday" class="on">Weekday</button>
+    <button type="button" data-day="saturday">Saturday</button>
+    <button type="button" data-day="sunday">Sunday</button>
+  </div>
+
+  <div class="row">
+    <button type="button" id="play" aria-label="Pause">Pause</button>
+    <label class="speed">Speed
+      <select id="speed">
+        <option value="60">1 min / s</option>
+        <option value="300" selected>5 min / s</option>
+        <option value="900">15 min / s</option>
+      </select>
+    </label>
+  </div>
+
+  <input type="range" id="time" min="300" max="1530" step="1" value="420" aria-label="Time of day">
+  <div class="ticks"><span>5 am</span><span>noon</span><span>6 pm</span><span>1:30 am</span></div>
+
+  <ul id="legend">
+    <li><i class="sw frequent"></i>High-frequency <small>80s, 90s</small></li>
+    <li><i class="sw base"></i>Base</li>
+    <li><i class="sw university"></i>University <small>50s, weekdays only</small></li>
+  </ul>
+  <p class="fine">Line thickness follows how often a bus comes at the shown time. Faint lines are not running.</p>
+
+  <p class="fine">
+    Bus positions are <b>simulated</b> from the proposed frequencies and average speeds; there is no timetable yet,
+    and the city says stops and schedules are tentative. Data: City of Guelph,
+    <a href="https://haveyoursay.guelph.ca/en/projects/transitupdate-2026">Transit Future Ready Action Plan Update</a>
+    (<a href="https://platform.remix.com/project/6a3a211f">Remix map</a>), consultation open 9–27 November 2026.
+    Not an official City of Guelph product.
+  </p>
+</section>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
