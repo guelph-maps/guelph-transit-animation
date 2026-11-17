@@ -10,7 +10,7 @@
   const COLORS = { frequent: '#d94f00', base: '#1b6fb5', university: '#7b3fb8' };
   const DAY_LABEL = { weekday: 'Weekday', saturday: 'Saturday', sunday: 'Sunday' };
   const T_MIN = 300 * 60;   // 05:00
-  const T_MAX = 1530 * 60;  // 01:30 next day
+  const T_MAX = 1560 * 60;  // 02:00 next day
 
   const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 300 };
   let net = null;
@@ -165,7 +165,7 @@
     const linePaint = {
       'line-color': classColor,
       'line-width': ['interpolate', ['linear'], ['zoom'], 10, ['*', 0.55, W], 13, W, 16, ['*', 1.6, W]],
-      'line-opacity': ['case', ['boolean', ['feature-state', 'on'], true], 0.8, 0.22],
+      'line-opacity': ['case', ['boolean', ['feature-state', 'on'], true], 0.8, 0.3],
     };
     // Order: base, then university (dashed), then high-frequency on top.
     map.addLayer({ id: 'routes-base', type: 'line', source: 'routes', filter: ['==', ['get', 'cls'], 'base'],
@@ -217,6 +217,7 @@
   }
 
   function render() {
+    if (!net) return;
     const buses = busesAt(state.t, state.day);
     map.getSource('buses').setData(busFeatures(buses));
     updateWidths();
@@ -235,7 +236,7 @@
     $('play').setAttribute('aria-label', on ? 'Pause' : 'Play');
   }
 
-  function bindUI() {
+  function bindControls() {
     $('days').addEventListener('click', e => {
       const btn = e.target.closest('button[data-day]');
       if (!btn) return;
@@ -246,7 +247,9 @@
     $('play').addEventListener('click', () => setPlaying(!state.playing));
     $('speed').addEventListener('change', e => { state.speed = +e.target.value; });
     $('time').addEventListener('input', e => { state.t = +e.target.value * 60; render(); });
+  }
 
+  function bindHover() {
     const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '280px' });
     const lineLayers = ['routes-base', 'routes-university', 'routes-frequent'];
     map.on('mousemove', e => {
@@ -282,6 +285,7 @@
   // ---------- start ----------
 
   async function start() {
+    bindControls();
     const [data] = await Promise.all([
       fetch('data/network.json').then(r => r.json()),
       new Promise(resolve => {
@@ -299,7 +303,7 @@
     ]);
     net = prepare(data);
     addLayers();
-    bindUI();
+    bindHover();
     render();
     loop();
     // For checking the simulation from the console.
