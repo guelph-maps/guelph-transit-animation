@@ -203,6 +203,14 @@
     });
   }
 
+  // Frame the whole network in the part of the map the panel does not cover.
+  function fitNetwork() {
+    const bounds = new maplibregl.LngLatBounds();
+    for (const route of net.routes) for (const dir of route.dirs) for (const s of dir.stops) bounds.extend([s.lon, s.lat]);
+    const narrow = window.matchMedia('(max-width: 640px)').matches;
+    map.fitBounds(bounds, { padding: narrow ? 24 : { top: 40, bottom: 40, right: 40, left: 340 }, animate: false });
+  }
+
   // ---------- UI ----------
 
   const $ = id => document.getElementById(id);
@@ -302,6 +310,7 @@
       }),
     ]);
     net = prepare(data);
+    fitNetwork();
     addLayers();
     bindHover();
     render();

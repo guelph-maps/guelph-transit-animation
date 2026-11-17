@@ -1,86 +1,99 @@
 # guelph-transit-animation
 
-An animated visualisation of the transit network Guelph Transit is proposing in its
-Future Ready Action Plan Update (public consultation 9–27 November 2026).
-
-**Status: empty, nothing built yet.** Only this README and the fetched source data exist.
-
-## Goal
+An animated map of the transit network Guelph Transit is proposing in its Future Ready
+Action Plan Update (public consultation 9–27 November 2026).
 
 The city published the proposed network as static PDF maps and an interactive Remix map.
 Neither shows what the service would feel like: how often a bus comes, where the frequent
-corridors are, how the network breathes over a day. The idea is to animate the proposed
-system — buses moving along the 34 proposed routes at the proposed frequencies — so a
-resident can see it rather than read a legend.
+corridors are, how the network breathes over a day. This page puts simulated buses on the
+34 proposed routes at the proposed frequencies, so a resident can see it rather than read
+a legend.
 
-This is meant to live in the `guelph-maps` GitHub organization. No remote exists yet;
-`/gh-init` from inside this folder creates one when it is time.
+Not an official City of Guelph product.
 
-## What is in `source/`
+## What it does
 
-Fetched 2026-11-17 from public, no-login endpoints. Kept here because the consultation
-closes 27 November and the map may be taken down or changed afterwards.
+- Buses move along all 34 proposed routes over a service day, 5 am to 2 am.
+- Weekday / Saturday / Sunday toggle. The six university routes (50–55) and the 92A
+  short turn run on weekdays only.
+- Play / pause, three speeds, and a time slider.
+- Route lines are coloured by class (high-frequency, base, university) and their
+  thickness follows how often a bus comes at the time shown. Routes not running are faint.
+- Hovering a line lists the routes there and their current frequency.
+
+## Run it
+
+It is a static site: `index.html`, `app.js`, `style.css` and `data/network.json`.
+Serve the folder with anything, for example:
+
+```
+python -m http.server 8765
+```
+
+and open http://localhost:8765. MapLibre GL JS is loaded from unpkg and the basemap from
+OpenFreeMap (no key).
+
+## How the simulation works, and what it assumes
+
+The city has published frequencies, not timetables, so every bus position is made up
+from these inputs per route and day type: service windows (start, end, headway) and an
+average speed.
+
+- **Round trips.** Each window sends a bus from the start of direction 0 every headway.
+  The bus runs direction 0, waits at the far end, runs direction 1 and disappears.
+- **`end` is read as "no departures at or after this time"**, so buses already out finish
+  their trip after it. The data does not say which meaning Remix intends.
+- **Layover** at the far end is the larger of 180 s and 15% of the outbound running time,
+  taken from the map's layover setting. Remix may apply it differently.
+- **Speed is one average per window**, stops included. Buses do not dwell at stops or
+  slow down downtown.
+- **Routes are independent.** No interlining, no timed connections, no garage trips.
+- **Statutory holidays** are not in the data and not shown.
+
+## Data
+
+`data/network.json` is the only data the page loads. `tools/build_data.py` builds it from
+two local inputs that are not in this repository:
 
 - `source/remix/maps_85f5b7bf.json` — the data behind the public Remix map
-  (`https://platform.remix.com/api/maps/85f5b7bf`). Checked contents:
-  - 34 lines (`lines[]`), including 12A/12B and a `92A Gordon (short turn to GCS)`;
-    each has patterns with two directions.
-  - 824 stops (`stops[]`) with point coordinates, names and GTFS stop codes.
-  - Per direction, an ordered `directionStops[]` with `placeId` and `distanceFromStart`
-    in metres (1,329 entries in total).
-  - Per line, `windows[]`: `start`/`end` in minutes after midnight, `headwaySeconds`,
-    average `speed`, tied through `dayTypeId` to weekday / Saturday / Sunday
-    (`dayTypes[].days` is a Mon–Sun bitmask such as `1111100`). Some lines have several
-    windows per day, e.g. 92 runs every 10 minutes until 22:00, then every 15.
-- `source/remix/projects_6a3a211f.json` — project metadata and the public description text.
-- `source/pdfs/Proposed Network Maps.pdf` — four vector-looking maps: all routes,
-  high-frequency, base, university. Lines and street names only; no stops or frequencies.
-- `source/pdfs/Information Sheet - FRAP Proposed Updates.pdf` — current vs proposed
-  service in prose: Sunday/Civic Holiday/Boxing Day 7:15 a.m.–10:15 p.m., statutory
-  holidays hourly 9:15 a.m.–6:45 p.m., First-Last Mile on-demand, Mobility changes.
-- `source/pdfs/Phase 1 Engagement Summary - Transit FRAP Update.pdf` — downloaded, not read.
+  (`https://platform.remix.com/api/maps/85f5b7bf`, fetched 2026-11-17, no login).
+  It has the 34 lines, 824 stops, the ordered stops of each direction with their distance
+  along the route, and the service windows. It has **no line geometry**.
+- `source/derived/shapes.json` — route shapes made by `tools/route_shapes.py`
+  (see below). Without it the build falls back to straight lines between stops.
 
-Source page: https://haveyoursay.guelph.ca/en/projects/transitupdate-2026
-(a JavaScript app; the PDFs are attached to phases and listed by
-`/web_api/v1/phases/<phase id>/files`).
+`source/` also holds the city's PDFs (network maps, information sheet, Phase 1 engagement
+summary), kept because the consultation closes on 27 November and the pages may change.
+
+Source page: https://haveyoursay.guelph.ca/en/projects/transitupdate-2026 ·
 Remix map: https://platform.remix.com/project/6a3a211f
 
-## Known gaps in the data
+Route classes come from the route number (80s and 90s high-frequency, 50s university,
+the rest base), which gives the 10 / 17 / 6 split the city describes when 12A and 12B
+count as one route.
 
-- **No route shapes.** The Remix JSON has no line geometry, only ordered stops. Shapes
-  have to come from somewhere: routing between consecutive stops on OpenStreetMap roads,
-  the vector paths in the PDF map, or Remix's map tiles. None of these was tried.
-- **No timetables.** Only headways and average speeds, so bus positions are simulated,
-  not scheduled. The city says stop locations and schedules are tentative.
-- **No statutory-holiday service** in the feed; only the info sheet's "hourly" line.
-- **No current network.** A before/after comparison needs Guelph Transit's existing GTFS.
+SHAPES_SECTION
 
-## Decided (2026-11-17)
+## Checks
 
-- **Form:** an interactive web map — a static site with a play/pause day clock and a
-  time slider, hostable on GitHub Pages. No video for now.
-- **First version shows:** simulated buses moving on all 34 proposed routes over a
-  service day; a weekday / Saturday / Sunday toggle; route lines weighted by frequency.
-  Proposed vs current is out of scope for the first version.
-- **Source files:** the public repo carries derived data only (the processed routes,
-  stops and headways the app needs), with attribution and links to the city's page.
-  The raw PDFs and Remix JSON stay local. They are in the initial commit, so `source/`
-  must be taken out of history before the first push.
+Run in the browser console (`window.sim` exposes the simulation):
 
-## Open questions
+- At 10:00 on a weekday every route has within one bus of
+  `round-trip time ÷ headway` buses out.
+- Weekday 34 routes run; Saturday and Sunday 27, the missing seven being 50–55 and 92A.
+- Peak buses out: 85 weekday, 67 Saturday, 67 Sunday. Nothing is out at 4:50 am.
 
-Still not decided:
+## Before publishing
 
-- **How to get shapes** (see gaps above), and how accurate they must be. First attempt:
-  route between consecutive stops on OpenStreetMap roads, check against the PDF map.
-- **How to tell it worked.** For example: bus counts per route matching
-  round-trip time ÷ headway, routes matching the PDF map by eye.
+- **`source/` is in the first two commits and must come out of history before the first
+  push.** It is untracked and git-ignored now, but the raw PDFs and Remix JSON are still
+  in the history. The public repository is meant to carry derived data only.
+- The repository is meant to live in the `guelph-maps` GitHub organization. No remote
+  exists yet; `/gh-init` creates one.
 
-## Leads — unverified, evaluate before using
+## Not done
 
-- `~/Code/guelph-bus-stops-layer` — sibling project found by name only; may already hold
-  current Guelph stop data. Not opened.
-- `~/Code/guelph-maps-github` — found by name only; probably about the organization
-  itself. Not opened.
-- Remix exposes a `tileServerEndpoint` in its page config; it may serve the route
-  geometry the JSON lacks. Not explored.
+- Proposed vs current network (needs Guelph Transit's existing GTFS).
+- Overlapping routes are drawn on top of each other, not side by side.
+- The 92 and 92A are simulated separately, so their buses are not evenly interleaved
+  on the shared part of Gordon Street.
