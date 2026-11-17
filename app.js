@@ -316,7 +316,7 @@
     render();
     loop();
     // For checking the simulation from the console.
-    window.sim = { net, state, busesAt, tripTimes, headwayAt, render };
+    window.sim = { net, map, state, busesAt, tripTimes, headwayAt, render };
   }
 
   start().catch(err => {

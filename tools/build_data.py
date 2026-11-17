@@ -52,6 +52,8 @@ def main():
 
     routes = []
     n_shaped = 0
+    global n_relaid
+    n_relaid = 0
     for line in sorted(remix["lines"], key=lambda l: sort_key(l["gtfsShortName"])):
         short = line["gtfsShortName"]
         patterns = [p for p in line["patterns"] if p["id"] in in_service]
@@ -86,6 +88,18 @@ def main():
                     m.append(round(m[-1] + haversine(a, b), 1))
             if any(y < x for x, y in zip(d, d[1:])) or any(y < x for x, y in zip(m, m[1:])):
                 sys.exit(f"{short}/{di}: stop distances are not non-decreasing")
+
+            # Where Remix's distance between two stops disagrees badly with the road
+            # (some are several times longer than any route), trust the road, so the
+            # bus neither crawls nor races on that leg.
+            fixed = [0.0]
+            for k in range(1, len(d)):
+                dd, dm = d[k] - d[k - 1], m[k] - m[k - 1]
+                if abs(dm - dd) > 80 and (dd <= 0 or not 0.6 <= dm / dd <= 1.6):
+                    dd = dm
+                    n_relaid += 1
+                fixed.append(round(fixed[-1] + dd, 1))
+            d = fixed
 
             dirs.append({
                 "name": direction["name"].capitalize(),
@@ -145,6 +159,7 @@ def main():
     print(f"{len(routes)} routes {counts}, {n_dirs} directions, {n_shaped} with road shapes")
     for day in ("weekday", "saturday", "sunday"):
         print(f"  {day}: {sum(1 for r in routes if r['service'][day])} routes in service")
+    print(f"{n_relaid} legs use the routed length instead of Remix's distance")
     print(f"wrote {OUT} ({os.path.getsize(OUT) / 1024:.0f} KB)")
 
 

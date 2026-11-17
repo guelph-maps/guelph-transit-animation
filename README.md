@@ -92,7 +92,7 @@ Known weak spots:
 - **Woodlawn Smart Centres and Stone Road Mall**: Remix's first legs are about twice the
   routed length, so its shape probably loops through the plaza and ours does not.
 - **Six directions are more than 8% off Remix's total length**: 13 eastbound (-19%),
-  80 inbound (-19%), 12A northbound (-13%), 9 northbound (+11%), 92A southbound (-11%),
+  80 inbound (-19%), 12A northbound (-13%), 9 northbound (+11%), 92A southbound (-10%),
   3 southbound (-10%). In each, one or two Remix distances are far longer than any route
   between the stops, which the routed line cannot reproduce.
 - **Stop order was repaired in 11 directions** (30 stops, most on routes 9 and 11). There
@@ -102,7 +102,16 @@ Known weak spots:
   the line. Route 9 northbound still doubles back once near Waterloo at Glasgow.
 
 Buses are placed by Remix distance mapped onto the line through the stops, so a shape
-that is a little long or short still has the bus at each stop at the right time.
+that is a little long or short still has the bus at each stop at the right time. On 10
+legs where Remix's distance is implausible against the road (less than 0.6 or more than
+1.6 times the routed length), the build uses the routed length instead, so buses do not
+crawl or race there.
+
+On four routes the two directions do not meet at one end (10, 53, 80, 93; gaps of
+270–490 m), so a bus jumps that far when it turns around.
+
+Route geometry is derived from OpenStreetMap, © OpenStreetMap contributors, ODbL, routed
+with OSRM and Valhalla (FOSSGIS server).
 
 ## Checks
 
@@ -111,9 +120,11 @@ Run in the browser console (`window.sim` exposes the simulation):
 - At 10:00 on a weekday every route has within one bus of
   `round-trip time ÷ headway` buses out.
 - Weekday 34 routes run; Saturday and Sunday 27, the missing seven being 50–55 and 92A.
-- Peak buses out: 85 weekday, 67 Saturday, 67 Sunday. Nothing is out at 4:50 am.
-- The routed lines were drawn to an image and compared by eye with the city's
-  high-frequency PDF map.
+- Peak buses out: 84 weekday, 67 Saturday, 67 Sunday. Nothing is out at 4:50 am.
+- The routed lines were drawn to an image and looked over against the city's
+  high-frequency PDF map: same corridors and overall layout, not a street-by-street check.
+- The page loads without console errors and all layers draw. **The road-shape version
+  has not been watched playing in a browser yet.**
 
 ## Before publishing
 
