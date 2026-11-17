@@ -27,11 +27,15 @@
   const TRANSFER_SLACK = 60;      // s needed at a stop before boarding the next bus
   const BOARD_PENALTY = 180;      // s a boarding must save to be worth making
   const MAX_BOARDINGS = 5;
+  const RACK_REACH = 150;         // m: a rack farther than this from any street is not used
+  const RACK_COLOR = '#0e8a6a';
 
-  const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 300 };
-  const rider = { pos: null, plan: null, marker: null, bikeMarker: null, destMarker: null, step: null, draggedAt: 0, rail: null, awarded: null };
+  // `parking`: the shadow bicycle is left at a rack at each end, and walked to and from.
+  const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 300, parking: false };
+  const rider = { pos: null, plan: null, marker: null, bikeMarker: null, destMarker: null, step: null, draggedAt: 0, rail: null, awarded: null, afoot: false };
   let net = null;
   let streets = null;
+  let racks = null;               // bicycle parking: [{ pos, snap }], from data/parking.json
   let map = null;
   let lastWidths = '';
 
@@ -244,6 +248,35 @@
         if (m <= TRANSFER_WALK) stops[a].near.push({ u: b, secs: m / WALK_SPEED });
       }
     }
+    snapRacks();
+  }
+
+  // ---------- bicycle parking ----------
+  //
+  // data/parking.json is where a bicycle can be parked: the racks of the Guelph Bike
+  // Parking Map (https://guelph.bike/), a sibling project.
+
+  function useParking(data) {
+    racks = [];
+    for (let i = 0; i < data.lonlat.length; i += 2) racks.push({ pos: [data.lonlat[i], data.lonlat[i + 1]], snap: null });
+    snapRacks();
+    document.getElementById('parking').disabled = false;
+  }
+
+  // Put the racks on the streets, once both are in (they arrive in either order), and
+  // drop the ones the street network does not reach.
+  function snapRacks() {
+    if (!racks) return;
+    if (streets) {
+      for (const r of racks) r.snap = snap(r.pos);
+      racks = racks.filter(r => r.snap && r.snap.off <= RACK_REACH);
+    }
+    map.getSource('racks').setData(rackFeatures());
+  }
+
+  function rackFeatures() {
+    return { type: 'FeatureCollection',
+      features: (racks || []).map(r => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: r.pos } })) };
   }
 
   // Cumulative metres along a line, and the point a share `f` of the way along it.
@@ -396,13 +429,69 @@
     // If the nearest stop has no bus worth taking, the wider plan decides whether to walk.
     const rides = near.legs.some(leg => leg.type === 'ride');
     const plan = !rides || far.t1 <= near.t1 - FAR_STOP_GAIN ? far : near;
-    // The shadow bicycle: the same start, end and leaving time, along the shortest way
-    // by the streets.
-    const line = walks.direct.line;
-    plan.bike = { line, cum: measure(line), m: walks.direct.m, t1: t0 + walks.direct.m / BIKE_SPEED };
+    setBike(plan, walks);
+    return plan;
+  }
+
+  // Give a plan its shadow bicycle (again, when the parking switch is thrown mid-trip).
+  function setBike(plan, walks) {
+    plan.bike = planBike(walks || tripWalks(plan.from, plan.to), plan.t0);
     // Whoever is there first is the fastest commuter, by however little.
     plan.winner = plan.bike.t1 < plan.t1 ? 'bike' : 'rider';
-    return plan;
+  }
+
+  // The shadow bicycle: the same start, end and leaving time, along the shortest way by
+  // the streets, door to door. With parking on, the bicycle is only ridden between two
+  // racks: the shadow walks to the rack nearest the start, rides to the one nearest the
+  // end and walks from there. If that is one and the same rack, or no quicker than
+  // walking the whole way, the shadow walks. Returns timed legs, as a rider's plan has.
+  function planBike(walks, t0) {
+    const { from, to, direct } = walks;
+    const timed = parts => {
+      let t = t0, m = 0, walkSecs = 0;
+      const legs = parts.map(p => {
+        const secs = p.m / (p.type === 'ride' ? BIKE_SPEED : WALK_SPEED);
+        const leg = { type: p.type, m: p.m, line: p.line, cum: measure(p.line), t0: t, t1: t + secs };
+        t = leg.t1; m += p.m;
+        if (p.type === 'walk') walkSecs += secs;
+        return leg;
+      });
+      const shown = legs.filter(leg => leg.t1 - leg.t0 >= 1);
+      return { legs: shown.length ? shown : legs, m, t1: t, walkSecs, racks: null, afoot: false };
+    };
+    if (!state.parking || !racks || !racks.length) return timed([{ type: 'ride', m: direct.m, line: direct.line }]);
+
+    const onStreets = !!walks.fromTree;
+    const nearest = (tree, p) => {
+      let best = -1, least = Infinity;
+      racks.forEach((r, i) => {
+        const m = tree ? metresTo(tree, r.snap) : haversine(p, r.pos) * WALK_DETOUR;
+        if (m < least) { least = m; best = i; }
+      });
+      return best;
+    };
+    const a = nearest(walks.fromTree, from), b = nearest(walks.toTree, to);
+    const afoot = () => Object.assign(timed([{ type: 'walk', m: direct.m, line: direct.line }]), { afoot: true });
+    if (a < 0 || b < 0 || a === b) return afoot();
+    const A = racks[a], B = racks[b];
+    const out = onStreets ? walkTo(walks.fromTree, A.snap) : crowWalk(from, A.pos);
+    const ride = onStreets ? walkTo(walkTree(A.snap, Infinity), B.snap) : crowWalk(A.pos, B.pos);
+    const back = onStreets ? walkTo(walks.toTree, B.snap) : crowWalk(to, B.pos);
+    const bike = timed([{ type: 'walk', m: out.m, line: out.line }, { type: 'ride', m: ride.m, line: ride.line },
+      { type: 'walk', m: back.m, line: back.line.slice().reverse() }]);
+    if (!(bike.t1 < t0 + direct.m / WALK_SPEED)) return afoot();
+    bike.racks = [A.pos, B.pos];
+    return bike;
+  }
+
+  // Where the shadow of a plan is at time `t`, and whether it is walking.
+  function shadowAt(plan, t) {
+    const legs = plan.bike.legs;
+    for (const leg of legs) {
+      if (t < leg.t1) return { pos: alongLine(leg.line, leg.cum, (t - leg.t0) / (leg.t1 - leg.t0)), afoot: leg.type === 'walk' };
+    }
+    const last = legs[legs.length - 1];
+    return { pos: last.line[last.line.length - 1], afoot: last.type === 'walk' };
   }
 
   // Earliest arrival from `from` to `to` leaving at `t0`, in rounds of one more boarding
@@ -516,7 +605,8 @@
     const features = [];
     const add = (kind, color, coordinates) => features.push({ type: 'Feature', properties: { kind, color }, geometry: { type: 'LineString', coordinates } });
     if (plan) {
-      add('bike', INK, plan.bike.line);
+      for (const leg of plan.bike.legs) add(leg.type === 'walk' ? 'bike-walk' : 'bike', INK, leg.line);
+      for (const pos of plan.bike.racks || []) features.push({ type: 'Feature', properties: { kind: 'rack' }, geometry: { type: 'Point', coordinates: pos } });
       for (const leg of plan.legs) {
         if (leg.type === 'walk') add('walk', INK, leg.line);
         else add('ride', net.routes[leg.r].color, lineBetween(net.routes[leg.r].dirs[leg.di], leg.i0, leg.i1));
@@ -599,15 +689,26 @@
       paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 13.5, 1.5, 17, 4], 'circle-color': '#fff',
         'circle-stroke-color': '#55606e', 'circle-stroke-width': 1 } });
 
+    // Bicycle parking, shown while the shadow bicycle uses it.
+    map.addSource('racks', { type: 'geojson', data: rackFeatures() });
+    map.addLayer({ id: 'racks', type: 'circle', source: 'racks', layout: { visibility: 'none' },
+      paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2, 14, 3.2, 17, 6], 'circle-color': RACK_COLOR,
+        'circle-opacity': 0.85, 'circle-stroke-color': '#fff', 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 11, 0.4, 14, 1] } });
+
     map.addSource('trip', { type: 'geojson', data: tripFeatures(null) });
     map.addLayer({ id: 'trip-bike', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'bike'],
       layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#7a8494', 'line-width': 2.5, 'line-opacity': 0.75 } });
+    map.addLayer({ id: 'trip-bike-walk', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'bike-walk'],
+      layout: { 'line-join': 'round' }, paint: { 'line-color': '#7a8494', 'line-width': 2.5, 'line-dasharray': [0.6, 1.4] } });
     map.addLayer({ id: 'trip-ride-case', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'ride'],
       layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': INK, 'line-width': 9 } });
     map.addLayer({ id: 'trip-ride', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'ride'],
       layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': lineColor, 'line-width': 5 } });
     map.addLayer({ id: 'trip-walk', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'walk'],
       layout: { 'line-join': 'round' }, paint: { 'line-color': INK, 'line-width': 3, 'line-dasharray': [0.6, 1.4] } });
+    // The two racks the shadow leaves its bicycle at.
+    map.addLayer({ id: 'trip-racks', type: 'circle', source: 'trip', filter: ['==', ['get', 'kind'], 'rack'],
+      paint: { 'circle-radius': 5.5, 'circle-color': '#fff', 'circle-stroke-color': RACK_COLOR, 'circle-stroke-width': 3.5 } });
 
     map.addLayer({ id: 'buses', type: 'circle', source: 'buses',
       paint: {
@@ -676,6 +777,7 @@
 
   const BIKE = '<svg viewBox="0 0 34 22" aria-hidden="true"><circle cx="7" cy="15" r="5.5"/><circle cx="27" cy="15" r="5.5"/>'
     + '<path d="M7 15l5-9h10l5 9M12 6l5 9 5-9M10.5 3h4M22 6l-1-3.5h3"/></svg>';
+  const AFOOT = FIGURE.replace('<svg', '<svg class="foot"');   // the shadow, walking
 
   // The fastest commuter's medal: two ribbon tails, a gold disc, and a pair of chevrons
   // for speed. Styled inline, so the rules for the other glyphs leave it alone.
@@ -713,7 +815,7 @@
     const bike = document.createElement('div');
     bike.className = 'bike';
     bike.title = 'The same trip by bicycle';
-    bike.innerHTML = BIKE + PIN;
+    bike.innerHTML = BIKE + AFOOT + PIN;
     rider.bikeMarker = new maplibregl.Marker({ element: bike, anchor: 'bottom' });
 
     const dest = document.createElement('div');
@@ -760,7 +862,7 @@
 
   // Move the map so the whole trip is clear of the two panels, if it is not already.
   function showTrip(plan) {
-    const pts = tripFeatures(plan).features.flatMap(f => f.geometry.coordinates);
+    const pts = tripFeatures(plan).features.flatMap(f => f.geometry.type === 'LineString' ? f.geometry.coordinates : []);
     const box = map.getContainer().getBoundingClientRect(), tp = $('trip-panel').getBoundingClientRect();
     const narrow = window.matchMedia('(max-width: 640px)').matches;
     const pad = narrow ? { top: tp.bottom - box.top + 44, bottom: 30, left: 30, right: 50 }
@@ -830,13 +932,18 @@
     $('trip-steps').innerHTML = rows.join('');
     // The bicycle's own timeline, beside the steps and on their clock: one line from
     // setting out to arriving, with a dot that rides down it.
+    // With parking on it is cut where the shadow gets on and off, the walks dotted.
     const bike = plan.bike;
-    $('trip-bike').innerHTML = BIKE + '<b>' + fmtMin(bike.t1 - plan.t0) + '</b>';
-    $('trip-bike').title = 'The same trip by bicycle';
-    $('trip-rail').innerHTML = '<i class="line"></i><i class="at"></i><div class="end"><b>' + fmtClock(bike.t1) + '</b><small>'
-      + fmtDist(bike.m) + '</small>' + (plan.winner === 'bike' ? AWARD : '') + '</div>';
-    $('trip-rail').setAttribute('aria-label', 'By bicycle: ' + fmtMin(bike.t1 - plan.t0) + ', there at ' + fmtClock(bike.t1)
-      + (plan.winner === 'bike' ? ', the fastest commuter' : ''));
+    const how = bike.afoot ? 'On foot all the way: the bicycle would be parked where it started'
+      : bike.racks ? 'The same trip by bicycle, parked at a rack at each end' : 'The same trip by bicycle';
+    const foot = bike.afoot ? 'on foot, no rack to ride to' : bike.racks ? fmtMin(bike.walkSecs) + ' of it on foot' : '';
+    $('trip-bike').innerHTML = (bike.afoot ? AFOOT : BIKE) + '<b>' + fmtMin(bike.t1 - plan.t0) + '</b>';
+    $('trip-bike').title = how;
+    $('trip-rail').innerHTML = bike.legs.map(leg => '<i class="line ' + leg.type + '"></i>').join('')
+      + '<i class="at"></i><div class="end"><b>' + fmtClock(bike.t1) + '</b><small>'
+      + fmtDist(bike.m) + '</small>' + (foot ? '<small>' + foot + '</small>' : '') + (plan.winner === 'bike' ? AWARD : '') + '</div>';
+    $('trip-rail').setAttribute('aria-label', how + ': ' + fmtMin(bike.t1 - plan.t0) + ', there at ' + fmtClock(bike.t1)
+      + (foot ? ', ' + foot : '') + (plan.winner === 'bike' ? ', the fastest commuter' : ''));
     $('trip-panel').hidden = false;
     layoutRail();
   }
@@ -857,9 +964,12 @@
       const i = marks.findIndex(m => m.t > t), a = marks[i - 1], b = marks[i];
       return a.y + (t - a.t) / (b.t - a.t) * (b.y - a.y);
     };
-    const [line, at, end] = rail.children, yEnd = yAt(plan.bike.t1);
-    line.style.top = first.y + 'px';
-    line.style.height = Math.max(0, yEnd - first.y) + 'px';
+    const at = rail.querySelector('.at'), end = rail.querySelector('.end'), yEnd = yAt(plan.bike.t1);
+    rail.querySelectorAll('.line').forEach((line, i) => {
+      const leg = plan.bike.legs[i], y0 = yAt(leg.t0);
+      line.style.top = y0 + 'px';
+      line.style.height = Math.max(0, yAt(leg.t1) - y0) + 'px';
+    });
     end.style.top = yEnd + 'px';
     rail.style.minHeight = Math.ceil(yEnd + end.offsetHeight) + 'px';
     rider.rail = { at, yAt };
@@ -876,9 +986,13 @@
 
   function renderRider() {
     if (!rider.plan) return;
-    const at = riderAt(rider.plan, state.t), bike = rider.plan.bike;
+    const at = riderAt(rider.plan, state.t), bike = rider.plan.bike, shadow = shadowAt(rider.plan, state.t);
     rider.marker.setLngLat(at.pos);
-    rider.bikeMarker.setLngLat(alongLine(bike.line, bike.cum, (state.t - rider.plan.t0) / (bike.t1 - rider.plan.t0)));
+    rider.bikeMarker.setLngLat(shadow.pos);
+    if (shadow.afoot !== rider.afoot) {
+      rider.afoot = shadow.afoot;
+      rider.bikeMarker.getElement().classList.toggle('afoot', shadow.afoot);
+    }
     if (rider.rail) rider.rail.at.style.transform = 'translateY(' + rider.rail.yAt(Math.min(state.t, bike.t1)) + 'px)';
     // The medal is won on arriving, and lost again if the clock is dragged back.
     const awarded = rider.plan.winner && state.t >= Math.min(rider.plan.t1, bike.t1) ? rider.plan.winner : null;
@@ -899,6 +1013,22 @@
     layoutRail();   // the row now in bold may have wrapped, and moved the rows below it
   }
 
+  // Throw the parking switch. A trip under way keeps its start, end and leaving time,
+  // and only its shadow is planned again.
+  function setParking(on) {
+    state.parking = on;
+    $('parking').checked = on;
+    map.setLayoutProperty('racks', 'visibility', on ? 'visible' : 'none');
+    const plan = rider.plan;
+    if (!plan) return;
+    setBike(plan);
+    map.getSource('trip').setData(tripFeatures(plan));
+    renderSteps(plan);
+    rider.step = null;    // the rows are new, and none is marked yet
+    setAward(null);       // nor is the medal: it is given again below if it is won
+    renderRider();
+  }
+
   function setPlaying(on) {
     state.playing = on;
     $('play').textContent = on ? 'Pause' : 'Play';
@@ -916,6 +1046,7 @@
     });
     $('play').addEventListener('click', () => setPlaying(!state.playing));
     $('trip-close').addEventListener('click', () => clearTrip());
+    $('parking').addEventListener('change', e => setParking(e.target.checked));
     $('speed').addEventListener('change', e => { state.speed = +e.target.value; });
     $('time').addEventListener('input', e => { state.t = +e.target.value * 60; render(); });
     // The rows move whenever the steps are laid out again: a new width, a font arriving.
@@ -988,8 +1119,10 @@
     // The streets arrive after the first frame; until then walks are straight lines.
     fetch('data/streets.json').then(r => r.json()).then(useStreets)
       .catch(err => console.error('no street network, walking in straight lines:', err));
+    fetch('data/parking.json').then(r => r.json()).then(useParking)
+      .catch(err => console.error('no bicycle parking, the bicycle rides door to door:', err));
     // For checking the simulation from the console.
-    window.sim = { net, map, state, rider, busesAt, tripTimes, headwayAt, render, planTrip, riderAt, sendRider, clearTrip, positionAt, snap, walkTree, metresTo, get streets() { return streets; } };
+    window.sim = { net, map, state, rider, busesAt, tripTimes, headwayAt, render, planTrip, riderAt, sendRider, clearTrip, positionAt, snap, walkTree, metresTo, shadowAt, setParking, get streets() { return streets; }, get racks() { return racks; } };
   }
 
   start().catch(err => {

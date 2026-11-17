@@ -39,6 +39,14 @@
 
   <div id="trip">
     <p id="trip-hint">Drag the figure to a start, then click the map: they go there by bus, leaving at the time shown. A bicycle sets out with them, and whichever is there first gets the medal.</p>
+    <label id="parking-switch">
+      <input type="checkbox" id="parking" disabled>
+      <span><b>Park the bicycle at a rack</b>
+        <small>Its rider walks to the nearest rack, rides to the one nearest where they are going, and walks from there.</small></span>
+    </label>
+    <a id="parking-link" href="https://guelph.bike/" target="_blank" rel="noopener">
+      <i class="rack-dot"></i><span>Racks from the <b>Guelph Bike Parking Map</b><small>guelph.bike · every rack in the city</small></span><em aria-hidden="true">→</em>
+    </a>
   </div>
 
   <ul id="legend">
@@ -53,6 +61,7 @@
     and the city says stops and schedules are tentative. Data: City of Guelph,
     <a href="https://haveyoursay.guelph.ca/en/projects/transitupdate-2026">Transit Future Ready Action Plan Update</a>
     (<a href="https://platform.remix.com/project/6a3a211f">Remix map</a>), consultation open 9–27 November 2026.
+    Bicycle parking: <a href="https://guelph.bike/">Guelph Bike Parking Map</a>, © OpenStreetMap contributors.
     Not an official City of Guelph product.
   </p>
 </section>

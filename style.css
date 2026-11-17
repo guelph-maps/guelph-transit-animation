@@ -3,6 +3,7 @@
   --muted: #5b6575;
   --paper: #ffffff;
   --rule: #dfe3e8;
+  --rack: #0e8a6a;   /* bicycle parking; RACK_COLOR in app.js */
 }
 
 * { box-sizing: border-box; }
@@ -62,6 +63,17 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 
 #trip { padding: 8px 0; border-top: 1px solid var(--rule); }
 #trip-hint { margin: 0; color: var(--muted); }
+#parking-switch { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; cursor: pointer; }
+#parking-switch input { flex: none; margin: 2px 0 0; width: 15px; height: 15px; accent-color: var(--rack); }
+#parking-switch b { display: block; font-weight: 600; }
+#parking-switch small, #parking-link small { display: block; font-size: 12px; color: var(--muted); }
+#parking-link { display: flex; align-items: center; gap: 9px; margin-top: 8px; padding: 7px 10px; border: 1px solid var(--rack);
+  border-radius: 8px; background: #edf7f3; color: inherit; text-decoration: none; }
+#parking-link:hover { background: #dff0ea; }
+#parking-link:focus-visible { outline: 2px solid #1b6fb5; outline-offset: 1px; }
+#parking-link span { flex: 1; min-width: 0; }
+#parking-link em { font-style: normal; font-size: 16px; color: var(--rack); }
+.rack-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--rack); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--rack); }
 
 #trip-panel {
   position: absolute;
@@ -111,6 +123,14 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .bike { width: 30px; height: 20px; pointer-events: none; }
 .bike > svg, #trip-bike > svg { display: block; width: 100%; height: 100%; opacity: 0.6; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .bike > svg { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff); }
+/* The shadow on foot, between a door and a rack: the figure, as faint as the bicycle. */
+.bike > svg.foot, #trip-bike > svg.foot { fill: var(--ink); stroke: #fff; stroke-width: 1.5; paint-order: stroke; }
+.bike > svg.foot { display: none; }
+.bike.afoot { width: 17px; height: 25px; }
+.bike.afoot > svg { display: none; }
+.bike.afoot > svg.foot { display: block; }
+.bike.afoot .medal { top: -12px; right: -14px; }
+#trip-bike > svg.foot { width: 13px; height: 19px; }
 #trip-bike { display: flex; align-items: center; gap: 7px; padding-left: 8px; }
 #trip-bike > svg { flex: none; width: 27px; height: 18px; }
 #trip-bike b { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -118,6 +138,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 /* The bicycle's line. app.js places .line, .at and .end on the clock of the steps. */
 #trip-rail { position: relative; border-left: 1px solid var(--rule); }
 #trip-rail .line { position: absolute; left: 10px; width: 3px; border-radius: 2px; background: #7a8494; opacity: 0.75; }
+#trip-rail .line.walk { border-radius: 0; background: repeating-linear-gradient(#7a8494 0 3px, transparent 3px 7px); }
 #trip-rail .at { position: absolute; left: 6px; top: -5.5px; z-index: 1; width: 11px; height: 11px; border-radius: 50%; background: var(--paper); border: 3px solid var(--ink); }
 #trip-rail .end { position: absolute; left: 0; right: 0; margin-top: -10px; padding-left: 23px; }
 #trip-rail .end::before { content: ""; position: absolute; left: 6px; top: 4.5px; width: 11px; height: 11px; border-radius: 50%; background: #7a8494; }

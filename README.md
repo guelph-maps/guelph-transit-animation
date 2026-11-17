@@ -13,6 +13,11 @@ Not an official City of Guelph product.
 
 Live: https://guelph-maps.github.io/guelph-transit-animation/
 
+Bicycle parking comes from a sibling project, the
+**[Guelph Bike Parking Map](https://guelph.bike/)**
+([guelph-maps/guelph-bike-parking](https://github.com/guelph-maps/guelph-bike-parking)):
+every rack in the city, by type and number of spaces.
+
 ## What it does
 
 - Buses move along all 34 proposed routes over a service day, 5 am to 2 am.
@@ -34,11 +39,17 @@ Live: https://guelph-maps.github.io/guelph-transit-animation/
   ends between the two rows it arrives between.
 - Whichever of the two is there first gets the fastest commuter's medal as it arrives,
   in the panel and on the map, by however little.
+- **Park the bicycle at a rack** (a switch, off to begin with) makes the bicycle's trip
+  an honest one: its rider walks to the rack nearest the start, rides to the rack
+  nearest where they are going, and walks from there. The racks show on the map as
+  green dots, the two in use ringed, and the shadow is a walking figure while it walks.
+  Beside the switch is a link to the [Guelph Bike Parking Map](https://guelph.bike/),
+  where the racks come from.
 
 ## Run it
 
-It is a static site: `index.html`, `app.js`, `style.css`, `data/network.json` and
-`data/streets.json`.
+It is a static site: `index.html`, `app.js`, `style.css`, `data/network.json`,
+`data/streets.json` and `data/parking.json`.
 Serve the folder with anything, for example:
 
 ```
@@ -102,6 +113,30 @@ same street network at a flat 15 km/h, lights and stops included. "The same rout
 read as the same start, end and leaving time, not the bus's path. It rides anything the
 rider can walk, steps and footpaths included, and knows nothing of hills, one-way
 streets or bike lanes.
+
+With **Park the bicycle at a rack** switched on, the bicycle is only ridden between two
+racks:
+
+- The shadow walks, at the rider's 4.8 km/h, to the rack nearest the start by the
+  streets, rides to the rack nearest the end, and walks from there. "Nearest" is taken
+  at its word: the nearest rack may be the wrong way, and no pair of racks is searched
+  for a quicker trip.
+- If both ends have the same nearest rack, or walking, riding and walking would be no
+  quicker than walking the whole way, the shadow walks the whole way.
+- Locking and unlocking take no time, and a rack is never full.
+- Throwing the switch during a trip plans the shadow again from the same start, end and
+  leaving time; the rider's trip is left alone.
+- Until the streets have loaded, the walks and the ride are straight lines.
+
+## Bicycle parking
+
+`data/parking.json` holds one position for each of 512 racks. `tools/build_parking.py`
+copies them from `../guelph-bike-parking/data/bike-parking.geojson`, the data behind the
+[Guelph Bike Parking Map](https://guelph.bike/) (OpenStreetMap as of 2026-11-16), which
+must be cloned beside this project to run it. Private parking (`access=private`, 2 racks)
+is left out, as it is on that map. A rack farther than 150 m from any street of
+`data/streets.json` would be dropped when the page loads; none is (the farthest is
+127 m).
 
 ## Data
 
@@ -189,7 +224,7 @@ crawl or race there.
 On four routes the two directions do not meet at one end (10, 53, 80, 93; gaps of
 270–490 m), so a bus jumps that far when it turns around.
 
-Route geometry and streets are derived from OpenStreetMap, © OpenStreetMap contributors, ODbL, routed
+Route geometry, streets and bicycle parking are derived from OpenStreetMap, © OpenStreetMap contributors, ODbL, routed
 with OSRM and Valhalla (FOSSGIS server).
 
 ## Checks
@@ -221,7 +256,21 @@ Run in the browser console (`window.sim` exposes the simulation):
   before the arrival and when the day changes. A walk of 300 m was looked at too. A
   bicycle far behind the bus was not.
 
+- Parking, on 300 random trips over the three day types: with the switch off every
+  bicycle is one ride at 15 km/h, as before. With it on, 292 walk, ride and walk, and 8
+  walk the whole way; the legs join end to start and to the two doors, every leg's line
+  is as long as its time says, and the shadow never jumps. Parking adds 10 minutes to
+  the bicycle's trip at the median (1 at the least, 34 at the most), and the bicycle
+  is there first in 210 of the 300, against 288 with the switch off.
+- Looked at with the switch on: a trip across the city on a desktop and a phone-sized
+  window, the switch thrown off and on again during it, a trip of 140 m with one rack
+  nearest both ends (the shadow walks), and one of 430 m where the nearest rack is the
+  wrong way.
+
 ## Not done
+
+- A sensible choice of rack: the shadow takes the nearest one at each end, however far
+  out of its way.
 
 - Proposed vs current network (needs Guelph Transit's existing GTFS).
 - Overlapping routes are drawn on top of each other, not side by side.
