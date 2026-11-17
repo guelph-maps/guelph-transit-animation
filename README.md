@@ -22,6 +22,9 @@ Live: https://guelph-maps.github.io/guelph-transit-animation/
 - Route lines are coloured by class (high-frequency, base, university) and their
   thickness follows how often a bus comes at the time shown. Routes not running are faint.
 - Hovering a line lists the routes there and their current frequency.
+- A rider stands on the map. Drag the figure to a start, click anywhere, and they travel
+  there by bus from the time shown: walking to a stop, waiting, riding the simulated bus,
+  changing if needed. The panel lists the steps with their times.
 
 ## Run it
 
@@ -51,6 +54,23 @@ average speed.
   slow down downtown.
 - **Routes are independent.** No interlining, no timed connections, no garage trips.
 - **Statutory holidays** are not in the data and not shown.
+
+## The rider
+
+The rider takes the same made-up timetable the bus dots follow, so during a ride the
+figure is on an actual simulated bus. The plan is the earliest arrival for leaving at the
+time shown (a RAPTOR search, up to four boardings), under these assumptions:
+
+- **Walking is a straight line** at 4.8 km/h, with distances multiplied by 1.3 for the
+  streets not being straight. The rider can walk to any stop, and between stops up to
+  300 m apart when changing buses.
+- **A change needs 60 s** at the stop, and a boarding has to save 3 minutes to be worth
+  making. If no bus beats walking the whole way, the rider walks.
+- **No staying on through the terminus.** A bus's outbound and return runs are separate
+  trips to the rider.
+- The plan is made once, for the day type and time of the click. Changing the day or
+  dragging the figure drops it; a trip still under way when the clock wraps at 2 am ends
+  at its destination.
 
 ## Data
 
@@ -126,6 +146,9 @@ Run in the browser console (`window.sim` exposes the simulation):
 - Peak buses out: 84 weekday, 67 Saturday, 67 Sunday. Nothing is out at 4:50 am.
 - The routed lines were drawn to an image and looked over against the city's
   high-frequency PDF map: same corridors and overall layout, not a street-by-street check.
+- 600 random trips over the three day types: in every ride leg the figure is within a
+  millimetre of a simulated bus of that route and direction, no trip is slower than
+  walking, and no weekday-only route is used on a weekend. At 3 am the plan is a walk.
 - The page loads without console errors and all layers draw. **The road-shape version
   has not been watched playing in a browser yet.**
 

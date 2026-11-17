@@ -63,6 +63,20 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 #time { width: 100%; margin: 4px 0 0; accent-color: var(--ink); }
 .ticks { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-bottom: 10px; }
 
+#trip { padding: 8px 0; border-top: 1px solid var(--rule); }
+#trip-hint { margin: 0; color: var(--muted); }
+#trip-steps { list-style: none; margin: 0; padding: 0; }
+#trip-steps li { display: flex; gap: 8px; padding: 2px 0 2px 6px; border-left: 3px solid transparent; }
+#trip-steps time { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); }
+#trip-steps li.done { color: var(--muted); }
+#trip-steps li.now { border-left-color: var(--ink); font-weight: 600; }
+#trip-steps li.arrive { margin-top: 2px; }
+
+.rider { width: 26px; height: 38px; cursor: grab; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.45)); }
+.rider:active { cursor: grabbing; }
+.rider svg { display: block; width: 100%; height: 100%; fill: var(--ink); stroke: #fff; stroke-width: 1.5; paint-order: stroke; }
+.dest { width: 16px; height: 16px; border-radius: 50%; background: var(--ink); border: 3px solid #fff; box-shadow: 0 0 0 2px var(--ink); }
+
 #legend { list-style: none; margin: 0 0 6px; padding: 8px 0 0; border-top: 1px solid var(--rule); }
 #legend li { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
 #legend small { color: var(--muted); }
