@@ -97,8 +97,7 @@
         const cum = [0];
         for (let i = 1; i < dir.line.length; i++) cum.push(cum[i - 1] + haversine(dir.line[i - 1], dir.line[i]));
         dir.cum = cum;
-        dir.stopD = dir.stops.map(s => s.d);
-        dir.stopM = dir.stops.map(s => s.m);
+        dir.stopD = dir.stopM = dir.stops.map(s => s.m);
       }
     }
     // Physical stops (several routes share one) and, for each, the stops close enough
@@ -324,14 +323,11 @@
     return [a[0] + g * (b[0] - a[0]), a[1] + g * (b[1] - a[1])];
   }
 
-  // Position of a bus that has covered `d` metres (Remix distance) of a direction.
-  // Remix distances are mapped onto our line through the stops, so a shape that is a
-  // little longer or shorter than Remix's still puts the bus at each stop on time.
+  // Position of a bus that has covered `d` metres of a direction. The line is the one
+  // on the city's Remix map, so a bus runs all of it, including what lies before the
+  // first stop and after the last, and a stop's distance is where it sits on the line.
   function positionAt(dir, d) {
-    const i = segment(dir.stopD, d);
-    const d0 = dir.stopD[i], d1 = dir.stopD[i + 1];
-    const f = d1 > d0 ? Math.min(1, Math.max(0, (d - d0) / (d1 - d0))) : 0;
-    return pointAtM(dir, dir.stopM[i] + f * (dir.stopM[i + 1] - dir.stopM[i]));
+    return pointAtM(dir, d);
   }
 
   // The part of a direction's line between two of its stops.

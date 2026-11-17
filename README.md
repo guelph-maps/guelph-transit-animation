@@ -175,19 +175,23 @@ is left out, as it is on that map. A rack farther than 150 m from any street of
 ## Data
 
 `data/network.json` holds the routes. `tools/build_data.py` builds it from
-three local inputs that are not in this repository (the raw city files stay local;
+four local inputs that are not in this repository (the raw city files stay local;
 only derived data is published):
 
 - `source/remix/maps_85f5b7bf.json` — the data behind the public Remix map
   (`https://platform.remix.com/api/maps/85f5b7bf`, fetched 2026-11-17, no login).
   It has the 34 lines, 824 stops, the ordered stops of each direction with their distance
-  along the route, and the service windows. It has **no line geometry**.
+  along the route, and the service windows. It has no line geometry.
+- `source/remix/directions_detail_85f5b7bf.json` — the line of each of the 68 directions,
+  which the map loads with a second request (`POST .../api/maps/85f5b7bf/directions/detail`,
+  fetched 2026-11-17, no login).
 - `source/remix/projects_6a3a211f.json` — the Remix project behind the same map. Its line settings hold the colour
   and dash of each of the 34 lines, which is where the colours here come from. They
   match the legend of the city's "Proposed Network: All Routes" PDF. Pairs that are one
   service share a colour: 80/81, 82/83, 51/52, 12A/12B.
-- `source/derived/shapes.json` — route shapes made by `tools/route_shapes.py`
-  (see below). Without it the build falls back to straight lines between stops.
+- `source/derived/shapes.json` — those lines decoded, with the stops placed on them, by
+  `tools/remix_shapes.py` (see below). Without it the build falls back to straight lines
+  between stops.
 
 `source/` also holds the city's PDFs (network maps, information sheet, Phase 1 engagement
 summary), kept because the consultation closes on 27 November and the pages may change.
@@ -222,44 +226,38 @@ straight line at the median and 1.62 at the 90th percentile; the worst are 3 to
 
 ## Route shapes
 
-Remix does not publish line geometry, so `tools/route_shapes.py` routes each of the 68
-directions through its stops on OpenStreetMap roads (the public OSRM server, kerb-side
-approaches; Valhalla's bus profile for legs a car cannot drive, such as the Guelph Central
-Station and University Centre platforms) and checks every leg against the distance Remix
-gives between the two stops. Raw responses are cached under `source/`, so a rerun makes
-no requests.
+Every line is the one the city drew on its Remix map. `tools/remix_shapes.py` asks Remix
+for the 68 directions the way the map itself does and decodes them (TWKB, a compact
+binary form of a line); the answer is kept under `source/`, so a rerun makes no request.
+Until 17 November the lines here were routed between the stops on OpenStreetMap roads
+instead, and about 16 km of them, in 40 of the 68 directions, ran more than 40 m from
+the city's line. The built lines are now the same as the map's to the metre.
 
-Result: 1,196 legs, of which 10 fell back to a straight segment and 28 keep a routed line
-that is outside tolerance (the larger of 60 m and 25%). Every stop is within 40 m of its
-line. The full list is in `source/derived/shapes_report.txt`.
+- **Stops are placed by where they sit on the line**, not by the distance Remix gives
+  them. In 17 directions that distance belongs to an earlier version of the line and is
+  off from some stop onward, by up to 3.5 km (the list is in
+  `source/derived/shapes_report.txt`). Travel order follows the line too, which changes
+  it in 8 directions.
+- **Where a line passes a stop twice** (a street driven out and back, a loop; 40 stops),
+  the pass nearest the stop is taken, then the one with the stop on its right. Two stops
+  were left to Remix's distance. On 16 inbound this puts "Southgate at Clair
+  southbound" on the way out and "950 Southgate northbound" on the way back, which is the
+  other way round from Remix's distances.
+- **A bus runs the whole line**, including what lies before the first stop and after the
+  last: 524 m past Kortright at Rickson on 53 outbound, 756 m past Woodlawn at Woolwich
+  on 93 northbound, 393 m before Macdonell at Wilson on 10 westbound.
+- **18 stretches of 100 m or more are one straight segment** (the longest 1.5 km, on
+  82 inbound). Measured against `data/streets.json`, 16 of them lie on a street to
+  within 4 m: Guelph's long streets are straight. Two leave the streets, and are drawn
+  as the city has them: 460 m near the end of 91 southbound (up to 127 m from any
+  street) and 434 m on 82 inbound (up to 35 m).
+- One stop is more than 40 m from its line: Edinburgh at Ironwood southbound on 52
+  inbound, 48 m.
+- Where a bus turns around, the two directions of every route meet (within 60 m), so
+  no bus jumps. Before, four routes had gaps of 270–490 m there.
 
-Known weak spots:
-
-- **Downtown around Wyndham Street and Guelph Central Station**: six of the ten straight
-  segments are here; every router detours.
-- **Woodlawn Smart Centres and Stone Road Mall**: Remix's first legs are about twice the
-  routed length, so its shape probably loops through the plaza and ours does not.
-- **Six directions are more than 8% off Remix's total length**: 13 eastbound (-19%),
-  80 inbound (-19%), 12A northbound (-13%), 9 northbound (+11%), 92A southbound (-10%),
-  3 southbound (-10%). In each, one or two Remix distances are far longer than any route
-  between the stops, which the routed line cannot reproduce.
-- **Stop order was repaired in 11 directions** (30 stops, most on routes 9 and 11). There
-  Remix's distances for recently added stops are on a different scale from the older
-  ones, so sorting by distance interleaves them wrongly. The builder keeps the longest
-  consistent chain of stops, routes through those, and places the rest by position along
-  the line. Route 9 northbound still doubles back once near Waterloo at Glasgow.
-
-Buses are placed by Remix distance mapped onto the line through the stops, so a shape
-that is a little long or short still has the bus at each stop at the right time. On 10
-legs where Remix's distance is implausible against the road (less than 0.6 or more than
-1.6 times the routed length), the build uses the routed length instead, so buses do not
-crawl or race there.
-
-On four routes the two directions do not meet at one end (10, 53, 80, 93; gaps of
-270–490 m), so a bus jumps that far when it turns around.
-
-Route geometry, streets and bicycle parking are derived from OpenStreetMap, © OpenStreetMap contributors, ODbL, routed
-with OSRM and Valhalla (FOSSGIS server).
+The streets and the bicycle parking are derived from OpenStreetMap, © OpenStreetMap
+contributors, ODbL.
 
 ## Checks
 
@@ -268,9 +266,13 @@ Run in the browser console (`window.sim` exposes the simulation):
 - At 10:00 on a weekday every route has within one bus of
   `round-trip time ÷ headway` buses out.
 - Weekday 34 routes run; Saturday and Sunday 27, the missing seven being 50–55 and 92A.
-- Peak buses out: 84 weekday, 67 Saturday, 67 Sunday. Nothing is out at 4:50 am.
-- The routed lines were drawn to an image and looked over against the city's
-  high-frequency PDF map: same corridors and overall layout, not a street-by-street check.
+- Peak buses out: 84 weekday, 68 Saturday, 67 Sunday. Nothing is out at 4:50 am.
+- Every built line was measured against the line Remix sends: nowhere more than 5 m
+  apart. Route 82 through the Arboretum was looked at beside the Remix map.
+- After the lines changed, 300 random trips over the three day types: in every ride leg
+  the figure is within a millimetre of a simulated bus of that route and direction, and
+  the rider is at every stop before their bus. The figures below are from the 600 trips
+  on the routed lines and were not rerun.
 - 600 random trips over the three day types, walking on the streets: in every ride leg
   the figure is within a millimetre of a simulated bus of that route and direction, the
   rider is at every stop before their bus, every walk's line is as long as its time

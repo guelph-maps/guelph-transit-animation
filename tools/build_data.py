@@ -3,7 +3,7 @@
 Inputs (local only, not published):
   source/remix/maps_85f5b7bf.json      the public Remix map of the proposed network
   source/remix/projects_6a3a211f.json  the Remix project: how the city draws each line
-  source/derived/shapes.json        optional; road-following shapes from tools/route_shapes.py
+  source/derived/shapes.json           optional; the map's own lines, from tools/remix_shapes.py
 
 Without shapes.json every direction is drawn as straight lines between its stops.
 
@@ -61,8 +61,6 @@ def main():
 
     routes = []
     n_shaped = 0
-    global n_relaid
-    n_relaid = 0
     for line in sorted(remix["lines"], key=lambda l: sort_key(l["gtfsShortName"])):
         short = line["gtfsShortName"]
         patterns = [p for p in line["patterns"] if p["id"] in in_service]
@@ -76,55 +74,39 @@ def main():
                 sys.exit(f"{short}/{di}: fewer than two stops")
             shape = shapes.get(f"{short}/{di}")
             if shape:
-                # The shape builder also repairs the stop order: in a few directions
-                # Remix's distances for recently added stops are on a different scale,
-                # so sorting by distance alone interleaves them wrongly.
+                # Travel order comes from the line, not from Remix's distanceFromStart,
+                # which in many directions belongs to an earlier version of the line.
                 if sorted(shape["order"]) != list(range(len(ds))):
                     sys.exit(f"{short}/{di}: shape order does not cover the stops")
                 ds = [ds[i] for i in shape["order"]]
                 coords = [stops_by_id[s["placeId"]]["geometry"]["coordinates"] for s in ds]
                 line_coords = shape["line"]
-                d = [round(x, 1) for x in shape["stopD"]]
                 m = [round(x, 1) for x in shape["stopM"]]
                 n_shaped += 1
             else:
                 coords = [stops_by_id[s["placeId"]]["geometry"]["coordinates"] for s in ds]
-                # d: metres along Remix's own (unpublished) shape, rebased so the first stop is 0.
-                d = [round(s["distanceFromStart"] - ds[0]["distanceFromStart"], 1) for s in ds]
                 line_coords = [[round(c[0], 6), round(c[1], 6)] for c in coords]
                 m = [0.0]
                 for a, b in zip(coords, coords[1:]):
                     m.append(round(m[-1] + haversine(a, b), 1))
-            if any(y < x for x, y in zip(d, d[1:])) or any(y < x for x, y in zip(m, m[1:])):
+            if any(y < x for x, y in zip(m, m[1:])):
                 sys.exit(f"{short}/{di}: stop distances are not non-decreasing")
-
-            # Where Remix's distance between two stops disagrees badly with the road
-            # (some are several times longer than any route), trust the road, so the
-            # bus neither crawls nor races on that leg.
-            fixed = [0.0]
-            for k in range(1, len(d)):
-                dd, dm = d[k] - d[k - 1], m[k] - m[k - 1]
-                if abs(dm - dd) > 80 and (dd <= 0 or not 0.6 <= dm / dd <= 1.6):
-                    dd = dm
-                    n_relaid += 1
-                fixed.append(round(fixed[-1] + dd, 1))
-            d = fixed
+            length = sum(haversine(a, b) for a, b in zip(line_coords, line_coords[1:]))
 
             dirs.append({
                 "name": direction["name"].capitalize(),
                 "from": stops_by_id[ds[0]["placeId"]]["name"],
                 "to": stops_by_id[ds[-1]["placeId"]]["name"],
-                "length": d[-1],          # metres, per Remix
-                "line": line_coords,      # [lon, lat]
+                "length": round(length, 1),   # metres of `line`; a bus runs all of it
+                "line": line_coords,          # [lon, lat]
                 "stops": [
                     {
                         "name": stops_by_id[s["placeId"]]["name"],
                         "lon": round(c[0], 6),
                         "lat": round(c[1], 6),
-                        "d": dd,          # metres from first stop, per Remix
                         "m": mm,          # metres along `line`
                     }
-                    for s, c, dd, mm in zip(ds, coords, d, m)
+                    for s, c, mm in zip(ds, coords, m)
                 ],
             })
 
@@ -160,7 +142,7 @@ def main():
         "title": "Guelph Transit proposed network (Future Ready Action Plan Update, November 2026)",
         "source": "City of Guelph public Remix map, https://platform.remix.com/project/6a3a211f, fetched 2026-11-17",
         "note": "Stops and frequencies are the city's tentative proposal. Bus positions are simulated from headways and average speeds, not from a timetable.",
-        "shapes": "OpenStreetMap roads" if n_shaped else "straight lines between stops",
+        "shapes": "the lines of the Remix map" if n_shaped else "straight lines between stops",
         "layover": {"seconds": layover["seconds"], "share": layover["percentage"]},
         "routes": routes,
     }
@@ -172,10 +154,9 @@ def main():
     counts = {}
     for r in routes:
         counts[r["class"]] = counts.get(r["class"], 0) + 1
-    print(f"{len(routes)} routes {counts}, {n_dirs} directions, {n_shaped} with road shapes")
+    print(f"{len(routes)} routes {counts}, {n_dirs} directions, {n_shaped} with the map's own line")
     for day in ("weekday", "saturday", "sunday"):
         print(f"  {day}: {sum(1 for r in routes if r['service'][day])} routes in service")
-    print(f"{n_relaid} legs use the routed length instead of Remix's distance")
     print(f"wrote {OUT} ({os.path.getsize(OUT) / 1024:.0f} KB)")
 
 
