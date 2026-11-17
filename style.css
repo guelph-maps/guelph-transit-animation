@@ -128,6 +128,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 #trip-head b span { margin-left: 3px; font-size: 14px; font-weight: 600; letter-spacing: 0; }
 #trip-head small { display: flex; flex-wrap: wrap; align-items: center; gap: 0 5px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 #trip-head small u { text-decoration: none; color: var(--ink); font-weight: 600; }
+.cur u { text-decoration: none; }
 #trip-buses { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 8px; }
 #trip-buses i { font-style: normal; color: var(--muted); }
 #trip-buses span { color: var(--muted); }

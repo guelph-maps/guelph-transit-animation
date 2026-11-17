@@ -23,7 +23,7 @@ every rack in the city, by type and number of spaces.
 - Buses move along all 34 proposed routes over a service day, 5 am to 2 am.
 - Weekday / Saturday / Sunday toggle. The six university routes (50–55) and the 92A
   short turn run on weekdays only.
-- Play / pause, three speeds (1, 2 or 5 minutes a second; 1 to begin with), and a time
+- Play / pause, three speeds (1, 2 or 5 minutes a second; 2 to begin with), and a time
   slider.
 - Each route line has the colour the city gives it on its own maps; university routes
   are dashed, as there. Thickness follows how often a bus comes at the time shown.
@@ -37,6 +37,16 @@ every rack in the city, by type and number of spaces.
   changing buses as often as it takes. A floating panel shows the trip: when they leave and
   arrive, which buses they take, and each step with its times: every walk, every wait
   of half a minute or more, and every ride is a step of its own.
+- **The rider's bus is marked** from the click until they get off it: a larger dot,
+  cased in ink as their ride's line is, with its route number at every zoom. One bus
+  at a time: after a change the mark moves to the next. While they are on their way to
+  it the stop they board at is ringed, and the status counts down ("Waiting · 8 in
+  4 min"). A bus that has not left its terminus yet waits there as a white ring; one
+  still on its outbound run or layover is marked where it is. The other buses are
+  left as they are.
+- Under each door-to-door speed is the speed **now**: 4.8 km/h walking, nothing while
+  waiting, the bus's average for that hour while riding (stops included, so it does
+  not drop at a stop), 15 km/h on the bicycle.
 - The panel is headed by the two totals, the rider's and the bicycle's, in the largest
   type there: how long each took is what is being compared. Under each is its
   door-to-door speed (see below). The totals are repeated in bold where each timeline
@@ -299,6 +309,13 @@ Run in the browser console (`window.sim` exposes the simulation):
   map keeps 63% of the height during a race at 375×667. All of it with the clock set by
   hand and a mouse: a race playing by itself, a finger's tap and a finger dragging the
   figure were not tried, and neither was a real phone or tablet.
+
+- The marked bus and the two speeds now were looked at on one weekday trip with a change
+  (the 8, then the 6), the clock set by hand: the white ring at the terminus before the
+  8 leaves, the marked 6 on its outbound run while the rider walks to it, the mark gone
+  after the last ride, and the speeds going 4.8, 0, 22, 4.8 km/h; on a desktop and at
+  360×640. A race playing by itself, a rider staying on through a terminus, and the
+  marked bus at the lowest zooms were not.
 
 ## Not done
 
