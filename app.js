@@ -1152,9 +1152,11 @@
     // Their bus on the map, and how long until it is at their stop.
     const bus = riderBusAt(plan, state.t);
     map.getSource('rider-bus').setData(riderBusFeatures(bus));
-    const due = bus && state.t < bus.leg.t0 ? ' · ' + bus.route.id + ' in ' + Math.max(1, Math.ceil((bus.leg.t0 - state.t) / 60)) + ' min' : '';
+    const due = bus && state.t < bus.leg.t0 ? ' the ' + bus.route.id + ' · ' + Math.max(1, Math.ceil((bus.leg.t0 - state.t) / 60)) + ' min' : '';
+    // A rider who stays on through the terminus is on the bus, not waiting for it.
     const status = at.step < 0 ? 'Setting out' : at.step >= legs ? 'Arrived'
-      : leg.type === 'walk' ? 'Walking' + due : state.t < leg.t0 ? 'Waiting' + due : 'On the ' + net.routes[leg.r].id;
+      : leg.type === 'walk' ? (due ? 'Walking to' + due : 'Walking')
+      : state.t < leg.t0 && !sameBus(plan, at.step) ? 'Waiting for' + due : 'On the ' + net.routes[leg.r].id;
     if ($('trip-status').textContent !== status) $('trip-status').textContent = status;
     // How fast each is going now: a bus at its average for the hour, a wait at nothing.
     const vR = at.step < 0 || at.step >= legs ? 0 : leg.type === 'walk' ? WALK_SPEED : state.t < leg.t0 ? 0 : leg.v;

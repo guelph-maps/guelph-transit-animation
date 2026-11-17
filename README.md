@@ -40,8 +40,8 @@ every rack in the city, by type and number of spaces.
 - **The rider's bus is marked** from the click until they get off it: a larger dot,
   cased in ink as their ride's line is, with its route number at every zoom. One bus
   at a time: after a change the mark moves to the next. While they are on their way to
-  it the stop they board at is ringed, and the status counts down ("Waiting · 8 in
-  4 min"). A bus that has not left its terminus yet waits there as a white ring; one
+  it the stop they board at is ringed, and the status counts down ("Waiting for
+  the 8 · 4 min"). A bus that has not left its terminus yet waits there as a white ring; one
   still on its outbound run or layover is marked where it is. The other buses are
   left as they are.
 - Under each door-to-door speed is the speed **now**: 4.8 km/h walking, nothing while
@@ -310,12 +310,19 @@ Run in the browser console (`window.sim` exposes the simulation):
   hand and a mouse: a race playing by itself, a finger's tap and a finger dragging the
   figure were not tried, and neither was a real phone or tablet.
 
-- The marked bus and the two speeds now were looked at on one weekday trip with a change
-  (the 8, then the 6), the clock set by hand: the white ring at the terminus before the
-  8 leaves, the marked 6 on its outbound run while the rider walks to it, the mark gone
-  after the last ride, and the speeds going 4.8, 0, 22, 4.8 km/h; on a desktop and at
-  360×640. A race playing by itself, a rider staying on through a terminus, and the
-  marked bus at the lowest zooms were not.
+- The marked bus, on 300 random trips over the three day types (535 rides, 12 moments
+  each from half an hour before setting out until the rider gets off): whenever it is
+  out it is within a millimetre of a simulated bus of its route (3,500 moments on the
+  rider's direction, 816 on the outbound run before it, 343 laying over), and 1,761
+  times it was still waiting at its terminus.
+- Looked at, the clock set by hand: a weekday trip with a change (the 8, then the 6),
+  with the white ring at the terminus before the 8 leaves, the marked 6 laying over
+  while the rider walks to it, the mark gone after the last ride, and the speeds going
+  4.8, 0, 22, 4.8 km/h, on a desktop and at 360×640; a rider staying on the 14 through
+  its terminus ("On the 14" throughout, no stop ringed); and the longest status
+  ("Waiting for the 12B · 12 min") fitting at 360 px. With the two speeds the map keeps
+  59% of the height during a race at 375×667, not the 63% above. A race playing by
+  itself and the marked bus at the lowest zooms were not looked at.
 
 ## Not done
 
