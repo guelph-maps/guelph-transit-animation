@@ -222,6 +222,13 @@
       }));
       for (let u = 0; u < n; u++) if (cur[u] < Infinity) reached.push([u, cur[u], how[k][u]]);
       if (!reached.length) break;
+      // Only a bus brings the rider to the stops near the end: the last walk is from
+      // one of those to the door.
+      for (const [u, arr, ride] of reached) {
+        if (egress[u] === Infinity) continue;
+        const score = arr + egress[u] + k * BOARD_PENALTY;
+        if (score < win.score) win = { score, k, u, ride };
+      }
       // Walk from where a bus dropped the rider to the stops nearby.
       for (const [u, arr, ride] of reached) for (const nb of stops[u].near) {
         const a = arr + nb.secs;
@@ -230,9 +237,6 @@
       for (let u = 0; u < n; u++) {
         if (cur[u] === Infinity) continue;
         best[u] = Math.min(best[u], cur[u]);
-        if (egress[u] === Infinity) continue;
-        const score = cur[u] + egress[u] + k * BOARD_PENALTY;
-        if (score < win.score) win = { score, k, u };
       }
       prev = cur;
     }
@@ -247,7 +251,7 @@
     let { k, u } = win;
     let end = to, endName = null;
     while (k > 0) {
-      const h = how[k][u];
+      const h = k === win.k ? win.ride : how[k][u];
       if (h.walkFrom !== undefined) {
         legs.unshift({ type: 'walk', a: stops[h.walkFrom].pos, b: end, to: endName });
         end = stops[h.walkFrom].pos;
@@ -503,8 +507,26 @@
     rider.destMarker.setLngLat(to).addTo(map);
     map.getSource('trip').setData(tripFeatures(rider.plan));
     renderSteps(rider.plan);
+    showTrip(rider.plan);
     if (!state.playing) setPlaying(true);
     renderRider();
+  }
+
+  // Move the map so the whole trip is clear of the two panels, if it is not already.
+  function showTrip(plan) {
+    const pts = tripFeatures(plan).features.flatMap(f => f.geometry.coordinates);
+    const box = map.getContainer().getBoundingClientRect(), tp = $('trip-panel').getBoundingClientRect();
+    const narrow = window.matchMedia('(max-width: 640px)').matches;
+    const pad = narrow ? { top: tp.bottom - box.top + 44, bottom: 30, left: 30, right: 50 }
+      : { top: 56, bottom: 40, left: 340, right: box.width >= 1000 ? box.right - tp.left + 30 : 60 };
+    const clear = pts.every(p => {
+      const q = map.project(p);
+      return q.x >= pad.left - 10 && q.x <= box.width - pad.right + 10 && q.y >= pad.top - 10 && q.y <= box.height - pad.bottom + 10;
+    });
+    if (clear) return;
+    const bounds = new maplibregl.LngLatBounds();
+    for (const p of pts) bounds.extend(p);
+    map.fitBounds(bounds, { padding: pad, maxZoom: Math.max(map.getZoom(), 14), duration: 600 });
   }
 
   function badge(route) {
@@ -523,8 +545,9 @@
     // staying with it is one bus, not a change.
     const sameBus = (leg, j) => {
       const before = plan.legs[j - 1];
-      return !!before && before.type === 'ride' && before.r === leg.r && before.di === 0 && leg.di === 1
-        && leg.i0 === 0 && before.i1 === net.routes[leg.r].dirs[0].stops.length - 1;
+      if (!before || before.type !== 'ride' || before.r !== leg.r || before.di !== 0 || leg.di !== 1) return false;
+      const run0 = net.routes[leg.r].dirs[0].length / before.v;
+      return Math.abs(leg.start - before.start - run0 - Math.max(net.layover.seconds, net.layover.share * run0)) < 1;
     };
     const buses = plan.legs.filter((leg, j) => leg.type === 'ride' && !sameBus(leg, j));
     const total = plan.t1 - plan.t0;
