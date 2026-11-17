@@ -7,7 +7,7 @@
 (function () {
   'use strict';
 
-  const COLORS = { frequent: '#d94f00', base: '#1b6fb5', university: '#7b3fb8' };
+  const INK = '#1c2330';
   const DAY_LABEL = { weekday: 'Weekday', saturday: 'Saturday', sunday: 'Sunday' };
   const T_MIN = 300 * 60;   // 05:00
   const T_MAX = 1560 * 60;  // 02:00 next day
@@ -51,8 +51,19 @@
     return lo;
   }
 
+  // Black or white, whichever reads better on a colour.
+  function inkOn(hex) {
+    const lum = c => {
+      const [r, g, b] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const L = lum(hex);
+    return 1.05 / (L + 0.05) >= (L + 0.05) / (lum(INK) + 0.05) ? '#fff' : INK;
+  }
+
   function prepare(data) {
     for (const route of data.routes) {
+      route.ink = inkOn(route.color);
       for (const dir of route.dirs) {
         const cum = [0];
         for (let i = 1; i < dir.line.length; i++) cum.push(cum[i - 1] + haversine(dir.line[i - 1], dir.line[i]));
@@ -313,7 +324,7 @@
       const ride = leg.type === 'ride';
       features.push({
         type: 'Feature',
-        properties: { kind: leg.type, cls: ride ? net.routes[leg.r].class : '' },
+        properties: { kind: leg.type, color: ride ? net.routes[leg.r].color : INK },
         geometry: { type: 'LineString', coordinates: ride ? lineBetween(net.routes[leg.r].dirs[leg.di], leg.i0, leg.i1) : [leg.a, leg.b] },
       });
     }
@@ -338,7 +349,7 @@
         features.push({
           type: 'Feature',
           id: r * 2 + di,
-          properties: { r, cls: route.class },
+          properties: { r, cls: route.class, color: route.color },
           geometry: { type: 'LineString', coordinates: dir.line },
         });
       });
@@ -362,13 +373,14 @@
       type: 'FeatureCollection',
       features: buses.map(b => ({
         type: 'Feature',
-        properties: { id: net.routes[b.r].id, cls: net.routes[b.r].class, waiting: b.waiting },
+        properties: { id: net.routes[b.r].id, color: net.routes[b.r].color, ink: net.routes[b.r].ink, waiting: b.waiting },
         geometry: { type: 'Point', coordinates: b.pos },
       })),
     };
   }
 
-  const classColor = ['match', ['get', 'cls'], 'frequent', COLORS.frequent, 'university', COLORS.university, COLORS.base];
+  // Each line in the colour the city gives it on its own maps.
+  const lineColor = ['get', 'color'];
 
   function addLayers() {
     map.addSource('routes', { type: 'geojson', data: routeFeatures() });
@@ -377,7 +389,7 @@
 
     const W = ['coalesce', ['feature-state', 'w'], 2];
     const linePaint = {
-      'line-color': classColor,
+      'line-color': lineColor,
       'line-width': ['interpolate', ['linear'], ['zoom'], 10, ['*', 0.55, W], 13, W, 16, ['*', 1.6, W]],
       'line-opacity': ['case', ['boolean', ['feature-state', 'on'], true], 0.8, 0.3],
     };
@@ -395,16 +407,16 @@
 
     map.addSource('trip', { type: 'geojson', data: tripFeatures(null) });
     map.addLayer({ id: 'trip-ride-case', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'ride'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#1c2330', 'line-width': 9 } });
+      layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': INK, 'line-width': 9 } });
     map.addLayer({ id: 'trip-ride', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'ride'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': classColor, 'line-width': 5 } });
+      layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': lineColor, 'line-width': 5 } });
     map.addLayer({ id: 'trip-walk', type: 'line', source: 'trip', filter: ['==', ['get', 'kind'], 'walk'],
-      paint: { 'line-color': '#1c2330', 'line-width': 3, 'line-dasharray': [0.6, 1.4] } });
+      paint: { 'line-color': INK, 'line-width': 3, 'line-dasharray': [0.6, 1.4] } });
 
     map.addLayer({ id: 'buses', type: 'circle', source: 'buses',
       paint: {
         'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 3, 13, 5.5, 16, 10],
-        'circle-color': classColor,
+        'circle-color': lineColor,
         'circle-opacity': ['case', ['get', 'waiting'], 0.55, 1],
         'circle-stroke-color': '#fff',
         'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 14, 1.6],
@@ -412,7 +424,7 @@
     map.addLayer({ id: 'bus-labels', type: 'symbol', source: 'buses', minzoom: 13.2,
       layout: { 'text-field': ['get', 'id'], 'text-font': ['Noto Sans Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], 13.2, 8.5, 16, 11.5],
         'text-allow-overlap': true, 'text-ignore-placement': true },
-      paint: { 'text-color': '#fff' } });
+      paint: { 'text-color': ['get', 'ink'] } });
   }
 
   function updateWidths() {
@@ -544,7 +556,7 @@
   }
 
   function badge(route) {
-    return '<b class="badge" style="background:' + COLORS[route.class] + '">' + esc(route.id) + '</b>';
+    return '<b class="badge" style="background:' + route.color + ';color:' + route.ink + '">' + esc(route.id) + '</b>';
   }
 
   function fmtDist(m) {
@@ -645,7 +657,7 @@
       if (!ids.length) { popup.remove(); return; }
       const rows = ids.map(r => {
         const route = net.routes[r], h = headwayAt(route, state.t, state.day);
-        return '<div' + (h ? '' : ' class="off"') + '><b style="color:' + COLORS[route.class] + '">' + route.id + '</b> '
+        return '<div' + (h ? '' : ' class="off"') + '>' + badge(route) + ' '
           + route.name + ' · ' + fmtHeadway(h) + '</div>';
       });
       popup.setLngLat(e.lngLat).setHTML('<div class="pop">' + rows.join('') + '</div>').addTo(map);

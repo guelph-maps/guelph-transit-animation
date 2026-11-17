@@ -19,8 +19,9 @@ Live: https://guelph-maps.github.io/guelph-transit-animation/
 - Weekday / Saturday / Sunday toggle. The six university routes (50–55) and the 92A
   short turn run on weekdays only.
 - Play / pause, three speeds, and a time slider.
-- Route lines are coloured by class (high-frequency, base, university) and their
-  thickness follows how often a bus comes at the time shown. Routes not running are faint.
+- Each route line has the colour the city gives it on its own maps; university routes
+  are dashed, as there. Thickness follows how often a bus comes at the time shown.
+  Routes not running are faint.
 - Hovering a line lists the routes there and their current frequency.
 - A rider stands on the map. Drag the figure to a start, click anywhere, and they travel
   there by bus from the time shown: walking to a stop, waiting, riding the simulated bus,
@@ -86,13 +87,18 @@ time shown (a RAPTOR search, up to five boardings), under these assumptions:
 ## Data
 
 `data/network.json` is the only data the page loads. `tools/build_data.py` builds it from
-two local inputs that are not in this repository (the raw city files stay local;
+three local inputs that are not in this repository (the raw city files stay local;
 only derived data is published):
 
 - `source/remix/maps_85f5b7bf.json` — the data behind the public Remix map
   (`https://platform.remix.com/api/maps/85f5b7bf`, fetched 2026-11-17, no login).
   It has the 34 lines, 824 stops, the ordered stops of each direction with their distance
   along the route, and the service windows. It has **no line geometry**.
+- `source/remix/projects_6a3a211f.json` — the Remix project behind the same map
+  (`https://platform.remix.com/api/projects/6a3a211f`). Its line settings hold the colour
+  and dash of each of the 34 lines, which is where the colours here come from. They
+  match the legend of the city's "Proposed Network: All Routes" PDF. Pairs that are one
+  service share a colour: 80/81, 82/83, 51/52, 12A/12B.
 - `source/derived/shapes.json` — route shapes made by `tools/route_shapes.py`
   (see below). Without it the build falls back to straight lines between stops.
 

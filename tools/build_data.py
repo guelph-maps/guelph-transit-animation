@@ -1,7 +1,8 @@
 """Build data/network.json, the only data file the web app loads.
 
 Inputs (local only, not published):
-  source/remix/maps_85f5b7bf.json   the public Remix map of the proposed network
+  source/remix/maps_85f5b7bf.json      the public Remix map of the proposed network
+  source/remix/projects_6a3a211f.json  the Remix project: how the city draws each line
   source/derived/shapes.json        optional; road-following shapes from tools/route_shapes.py
 
 Without shapes.json every direction is drawn as straight lines between its stops.
@@ -11,10 +12,12 @@ Run:  python -I tools/build_data.py
 import json
 import math
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REMIX = os.path.join(ROOT, "source", "remix", "maps_85f5b7bf.json")
+PROJECT = os.path.join(ROOT, "source", "remix", "projects_6a3a211f.json")
 SHAPES = os.path.join(ROOT, "source", "derived", "shapes.json")
 OUT = os.path.join(ROOT, "data", "network.json")
 
@@ -45,6 +48,12 @@ def main():
     remix = json.load(open(REMIX, encoding="utf-8"))
     shapes = json.load(open(SHAPES, encoding="utf-8")) if os.path.exists(SHAPES) else {}
     stops_by_id = {s["id"]: s for s in remix["stops"]}
+
+    # The colour and dash the city gave each line on its Remix map.
+    project = json.load(open(PROJECT, encoding="utf-8"))
+    if len(project["scenarios"]) != 1:
+        sys.exit(f"expected one scenario, found {len(project['scenarios'])}")
+    drawn = {s["lineId"]: s for s in project["scenarios"][0]["lineSettings"]}
 
     in_service = set()
     for ids in remix["inServicePatternIdsByDayBatchId"].values():
@@ -119,6 +128,12 @@ def main():
                 ],
             })
 
+        look = drawn.get(line["id"])
+        if not look or not re.fullmatch(r"#[0-9a-fA-F]{6}", look["color"] or ""):
+            sys.exit(f"{short}: no line colour in the Remix project")
+        if (look["lineStyle"] == "dashed") != (route_class(short) == "university"):
+            sys.exit(f"{short}: line style {look['lineStyle']} does not match its class")
+
         day_of = {dt["id"]: DAY_KEYS[dt["days"]] for dt in line["dayTypes"]}
         service = {"weekday": [], "saturday": [], "sunday": []}
         for w in sorted(line["windows"], key=lambda w: w["start"]):
@@ -135,6 +150,7 @@ def main():
             "id": short,
             "name": line["gtfsLongName"],
             "class": route_class(short),
+            "color": look["color"].lower(),      # as on the city's Remix map
             "dirs": dirs,
             "service": service,
         })
