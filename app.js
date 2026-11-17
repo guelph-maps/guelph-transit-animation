@@ -934,9 +934,9 @@
     // setting out to arriving, with a dot that rides down it.
     // With parking on it is cut where the shadow gets on and off, the walks dotted.
     const bike = plan.bike;
-    const how = bike.afoot ? 'On foot all the way: the bicycle would be parked where it started'
+    const how = bike.afoot ? 'On foot all the way: riding between the two nearest racks would be no quicker'
       : bike.racks ? 'The same trip by bicycle, parked at a rack at each end' : 'The same trip by bicycle';
-    const foot = bike.afoot ? 'on foot, no rack to ride to' : bike.racks ? fmtMin(bike.walkSecs) + ' of it on foot' : '';
+    const foot = bike.afoot ? 'on foot all the way' : bike.racks ? fmtMin(bike.walkSecs) + ' of it on foot' : '';
     $('trip-bike').innerHTML = (bike.afoot ? AFOOT : BIKE) + '<b>' + fmtMin(bike.t1 - plan.t0) + '</b>';
     $('trip-bike').title = how;
     $('trip-rail').innerHTML = bike.legs.map(leg => '<i class="line ' + leg.type + '"></i>').join('')
