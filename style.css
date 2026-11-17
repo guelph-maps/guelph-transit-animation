@@ -193,6 +193,9 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 #legend { list-style: none; margin: 0 0 6px; padding: 8px 0 0; border-top: 1px solid var(--rule); }
 #legend li { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
 #legend small { color: var(--muted); }
+/* A family of route numbers, 8X for 80 to 89, as a route badge in the average of their colours. */
+#legend .badge { background: var(--muted); margin-right: -4px; }
+#legend .badge + small { margin-left: 4px; }
 .sw { display: inline-block; width: 26px; height: 0; border-top: 3px solid var(--muted); flex: none; }
 .sw.frequent { border-top-width: 6px; }
 .sw.university { border-top-style: dashed; }

@@ -28,6 +28,9 @@ every rack in the city, by type and number of spaces.
 - Each route line has the colour the city gives it on its own maps; university routes
   are dashed, as there. Thickness follows how often a bus comes at the time shown.
   Routes not running are faint.
+- The legend names each family of routes by its number, shaped as a route badge: 8X
+  and 9X for the high-frequency 80s and 90s, 5X for the university 50s. Each badge is
+  the average of its routes' colours, mixed in linear light.
 - Hovering a line lists the routes there and their current frequency.
 - A rider stands on the map. Drag the figure to a start, click anywhere, and they travel
   there by bus from the time shown: walking to a stop, waiting, riding the simulated bus,
@@ -44,7 +47,7 @@ every rack in the city, by type and number of spaces.
   ends between the two rows it arrives between.
 - Whichever of the two is there first gets the fastest commuter's medal as it arrives,
   in the panel and on the map, by however little.
-- **Park the bicycle at a rack** (a switch, off to begin with) makes the bicycle's trip
+- **Park the bicycle at a rack** (a switch, on to begin with) makes the bicycle's trip
   an honest one: its rider walks to the rack nearest the start, rides to the rack
   nearest where they are going, and walks from there. The racks show on the map as
   green dots, the two in use ringed, and the shadow is a walking figure while it walks.

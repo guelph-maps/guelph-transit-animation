@@ -31,7 +31,7 @@
   const RACK_COLOR = '#0e8a6a';
 
   // `parking`: the shadow bicycle is left at a rack at each end, and walked to and from.
-  const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 60, parking: false };
+  const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 60, parking: true };
   const rider = { pos: null, plan: null, marker: null, bikeMarker: null, destMarker: null, step: null, draggedAt: 0, rail: null, awarded: null, afoot: false };
   let net = null;
   let streets = null;
@@ -66,6 +66,22 @@
     };
     const L = lum(hex);
     return 1.05 / (L + 0.05) >= (L + 0.05) / (lum(INK) + 0.05) ? '#fff' : INK;
+  }
+
+  // The legend's badges stand for a family of routes, 8X for the 80s: each takes the
+  // average of its routes' colours, mixed in linear light so it is not darker than them.
+  function paintLegend(routes) {
+    const lin = v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    const unlin = v => Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055));
+    for (const el of document.querySelectorAll('#legend .badge[data-tens]')) {
+      const those = routes.filter(r => /^\d\d/.test(r.id) && r.id[0] === el.dataset.tens);
+      if (!those.length) continue;
+      const hex = '#' + [1, 3, 5].map(i => unlin(those.reduce((sum, r) => sum + lin(parseInt(r.color.slice(i, i + 2), 16) / 255), 0) / those.length)
+        .toString(16).padStart(2, '0')).join('');
+      el.style.background = hex;
+      el.style.color = inkOn(hex);
+      el.title = 'Routes ' + those.map(r => r.id).join(', ');
+    }
   }
 
   function prepare(data) {
@@ -261,6 +277,7 @@
     for (let i = 0; i < data.lonlat.length; i += 2) racks.push({ pos: [data.lonlat[i], data.lonlat[i + 1]], snap: null });
     snapRacks();
     document.getElementById('parking').disabled = false;
+    if (state.parking) setParking(true);   // a trip made before the racks came in is planned again
   }
 
   // Put the racks on the streets, once both are in (they arrive in either order), and
@@ -694,7 +711,7 @@
 
     // Bicycle parking, shown while the shadow bicycle uses it.
     map.addSource('racks', { type: 'geojson', data: rackFeatures() });
-    map.addLayer({ id: 'racks', type: 'circle', source: 'racks', layout: { visibility: 'none' },
+    map.addLayer({ id: 'racks', type: 'circle', source: 'racks', layout: { visibility: state.parking ? 'visible' : 'none' },
       paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2, 14, 3.2, 17, 6], 'circle-color': RACK_COLOR,
         'circle-opacity': 0.85, 'circle-stroke-color': '#fff', 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 11, 0.4, 14, 1] } });
 
@@ -1126,6 +1143,7 @@
       }),
     ]);
     net = prepare(data);
+    paintLegend(net.routes);
     fitNetwork();
     addLayers();
     bindHover();

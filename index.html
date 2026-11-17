@@ -49,15 +49,15 @@
       <label id="parking-switch">
         <span><b>Park the bicycle at a rack</b>
           <small>Its rider walks to the nearest rack, rides to the one nearest where they are going, and walks from there.</small></span>
-        <input type="checkbox" role="switch" id="parking" disabled><i aria-hidden="true"></i>
+        <input type="checkbox" role="switch" id="parking" checked disabled><i aria-hidden="true"></i>
       </label>
     </div>
   </div>
 
   <ul id="legend">
-    <li><i class="sw frequent"></i>High-frequency <small>80s, 90s</small></li>
+    <li><i class="sw frequent"></i>High-frequency <b class="badge" data-tens="8">8X</b><b class="badge" data-tens="9">9X</b></li>
     <li><i class="sw base"></i>Base</li>
-    <li><i class="sw university"></i>University <small>50s, weekdays only</small></li>
+    <li><i class="sw university"></i>University <b class="badge" data-tens="5">5X</b><small>weekdays only</small></li>
   </ul>
   <p class="fine">Each line has the colour the city gives it on its own maps. Thickness follows how often a bus comes at the shown time. Faint lines are not running.</p>
 
