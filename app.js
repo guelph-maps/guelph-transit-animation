@@ -31,7 +31,7 @@
   const RACK_COLOR = '#0e8a6a';
 
   // `parking`: the shadow bicycle is left at a rack at each end, and walked to and from.
-  const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 300, parking: false };
+  const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 60, parking: false };
   const rider = { pos: null, plan: null, marker: null, bikeMarker: null, destMarker: null, step: null, draggedAt: 0, rail: null, awarded: null, afoot: false };
   let net = null;
   let streets = null;

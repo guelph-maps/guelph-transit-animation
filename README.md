@@ -23,7 +23,8 @@ every rack in the city, by type and number of spaces.
 - Buses move along all 34 proposed routes over a service day, 5 am to 2 am.
 - Weekday / Saturday / Sunday toggle. The six university routes (50–55) and the 92A
   short turn run on weekdays only.
-- Play / pause, three speeds, and a time slider.
+- Play / pause, three speeds (1, 2 or 5 minutes a second; 1 to begin with), and a time
+  slider.
 - Each route line has the colour the city gives it on its own maps; university routes
   are dashed, as there. Thickness follows how often a bus comes at the time shown.
   Routes not running are faint.

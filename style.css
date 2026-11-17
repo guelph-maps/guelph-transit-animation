@@ -56,7 +56,17 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 #days button { flex: 1; }
 #days button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
 #play { min-width: 72px; }
-.speed { margin-left: auto; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.speed { margin-left: auto; color: var(--muted); display: flex; gap: 7px; align-items: center; }
+.speed small { font-size: 12px; white-space: nowrap; }
+/* Three radio buttons as one pill: the chosen speed is the dark disc that slides to it. */
+.seg { position: relative; display: inline-flex; padding: 2px; border: 1px solid #c5ccd6; border-radius: 999px; background: #f3f5f7; }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.seg label span { display: block; min-width: 30px; padding: 3px 0; border-radius: 999px; text-align: center; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--muted); transition: background 0.15s, color 0.15s, box-shadow 0.15s; }
+.seg label:hover span { color: var(--ink); }
+.seg input:checked + span { background: var(--ink); color: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); }
+.seg input:focus-visible + span { outline: 2px solid #1b6fb5; outline-offset: 1px; }
 
 #time { width: 100%; margin: 4px 0 0; accent-color: var(--ink); }
 .ticks { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-bottom: 10px; }

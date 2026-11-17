@@ -25,13 +25,14 @@
 
   <div class="row">
     <button type="button" id="play" aria-label="Pause">Pause</button>
-    <label class="speed">Speed
-      <select id="speed">
-        <option value="60">1 min / s</option>
-        <option value="300" selected>5 min / s</option>
-        <option value="900">15 min / s</option>
-      </select>
-    </label>
+    <div class="speed" id="speed" role="radiogroup" aria-label="Speed, in minutes a second">
+      <span class="seg">
+        <label><input type="radio" name="speed" value="60" checked><span>1</span></label>
+        <label><input type="radio" name="speed" value="120"><span>2</span></label>
+        <label><input type="radio" name="speed" value="300"><span>5</span></label>
+      </span>
+      <small>min / s</small>
+    </div>
   </div>
 
   <input type="range" id="time" min="300" max="1560" step="1" value="420" aria-label="Time of day">
