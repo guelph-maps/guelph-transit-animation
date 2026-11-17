@@ -16,10 +16,13 @@
   // not being straight.
   const WALK_SPEED = 4.8 / 3.6;   // m/s
   const WALK_DETOUR = 1.3;
-  const TRANSFER_RADIUS = 300;    // m, straight line, between stops when changing buses
+  const ACCESS_MARGIN = 400;      // m: the rider uses the nearest stop, or one up to this much farther
+  const WALK_ALL_MAX = 15 * 60;   // s: the longest trip the rider will walk when a bus could do it
+  const WALK_ALL_RATIO = 1.5;     // ...unless the buses would take this many times as long
+  const TRANSFER_RADIUS = 400;    // m, straight line, between stops when changing buses
   const TRANSFER_SLACK = 60;      // s needed at a stop before boarding the next bus
   const BOARD_PENALTY = 180;      // s a boarding must save to be worth making
-  const MAX_BOARDINGS = 4;
+  const MAX_BOARDINGS = 5;
 
   const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 300 };
   const rider = { pos: null, plan: null, marker: null, destMarker: null, step: null, draggedAt: 0 };
@@ -170,17 +173,28 @@
     return best;
   }
 
+  // Seconds on foot between a point and each stop the rider would use from there: the
+  // nearest one and any up to ACCESS_MARGIN farther (the stop across the street, the
+  // other route round the corner). Infinity for the rest.
+  function stopsNear(p) {
+    const stops = net.ustops, d = stops.map(s => haversine(p, s.pos));
+    const limit = Math.min(...d) + ACCESS_MARGIN;
+    return Float64Array.from(d, m => m <= limit ? m * WALK_DETOUR / WALK_SPEED : Infinity);
+  }
+
   // Earliest arrival from `from` to `to` leaving at `t0`, in rounds of one more boarding
-  // each (RAPTOR). Returns the legs to follow, with their times.
+  // each (RAPTOR). The rider walks only to the stops near the start, between nearby stops
+  // to change buses, and from the stops near the end. Returns the legs, with their times.
   function planTrip(from, to, t0, day) {
     const stops = net.ustops, n = stops.length;
+    const access = stopsNear(from), egress = stopsNear(to);
     const best = new Float64Array(n);
     let prev = new Float64Array(n);
     const how = [new Array(n)];             // how[k][u]: what brought the rider to u in round k
-    for (let u = 0; u < n; u++) prev[u] = best[u] = t0 + walkSecs(from, stops[u].pos);
+    for (let u = 0; u < n; u++) prev[u] = best[u] = t0 + access[u];
 
     const direct = t0 + walkSecs(from, to);
-    let win = { score: direct, k: 0, u: -1 };
+    let win = { score: Infinity, k: 0, u: -1 };
 
     for (let k = 1; k <= MAX_BOARDINGS; k++) {
       const cur = new Float64Array(n).fill(Infinity);
@@ -190,7 +204,7 @@
         let trip = null;
         for (let i = 0; i < dir.stops.length; i++) {
           const u = dir.stops[i].u;
-          if (trip && i > trip.i0) {
+          if (trip && dir.stopD[i] > dir.stopD[trip.i0]) {
             const arr = trip.start + dir.stopD[i] / trip.v;
             if (arr < cur[u] && arr < best[u]) {
               cur[u] = arr;
@@ -216,11 +230,17 @@
       for (let u = 0; u < n; u++) {
         if (cur[u] === Infinity) continue;
         best[u] = Math.min(best[u], cur[u]);
-        const score = cur[u] + walkSecs(stops[u].pos, to) + k * BOARD_PENALTY;
+        if (egress[u] === Infinity) continue;
+        const score = cur[u] + egress[u] + k * BOARD_PENALTY;
         if (score < win.score) win = { score, k, u };
       }
       prev = cur;
     }
+
+    // Walking all the way wins if no bus gets there, if it is short and no slower, or
+    // if the buses would take over WALK_ALL_RATIO times as long.
+    const noBus = win.k === 0, onFoot = direct - t0;
+    if (onFoot <= win.score - t0 && (onFoot <= WALK_ALL_MAX || onFoot * WALK_ALL_RATIO < win.score - t0)) win = { score: direct, k: 0, u: -1 };
 
     // Walk the winner back to the start, then time the legs forwards.
     const legs = [];
@@ -250,7 +270,7 @@
       else leg.ready = t;           // the rider waits at the stop from `ready` to `t0`
       t = leg.t1;
     }
-    return { from, to, day, t0, t1: t, legs: legs.filter(leg => leg.type === 'ride' || leg.t1 - leg.t0 >= 1) };
+    return { from, to, day, t0, t1: t, noBus, legs: legs.filter(leg => leg.type === 'ride' || leg.t1 - leg.t0 >= 1) };
   }
 
   // Where the rider of a plan is at time `t`, and which leg they are on.
@@ -471,7 +491,7 @@
     rider.marker.setLngLat(rider.pos);
     map.getSource('trip').setData(tripFeatures(null));
     $('trip-steps').innerHTML = '';
-    $('trip-hint').hidden = false;
+    $('trip-panel').hidden = true;
   }
 
   function sendRider(to) {
@@ -487,34 +507,72 @@
     renderRider();
   }
 
+  function badge(route) {
+    return '<b class="badge" style="background:' + COLORS[route.class] + '">' + esc(route.id) + '</b>';
+  }
+
+  function fmtDist(m) {
+    return m < 950 ? Math.max(10, Math.round(m / 10) * 10) + ' m' : (m / 1000).toFixed(1) + ' km';
+  }
+
+  // The floating trip panel: when, which buses, each step with its times, and how the
+  // time splits into walking, waiting and riding. One <li> per leg, then the arrival.
   function renderSteps(plan) {
-    const rows = plan.legs.map(leg => {
+    const rides = plan.legs.filter(leg => leg.type === 'ride');
+    // A bus that reaches its terminus lays over and comes back as the other direction;
+    // staying with it is one bus, not a change.
+    const sameBus = (leg, j) => {
+      const before = plan.legs[j - 1];
+      return !!before && before.type === 'ride' && before.r === leg.r && before.di === 0 && leg.di === 1
+        && leg.i0 === 0 && before.i1 === net.routes[leg.r].dirs[0].stops.length - 1;
+    };
+    const buses = plan.legs.filter((leg, j) => leg.type === 'ride' && !sameBus(leg, j));
+    const total = plan.t1 - plan.t0;
+    let walk = 0, wait = 0, ride = 0;
+    const rows = plan.legs.map((leg, j) => {
       if (leg.type === 'walk') {
-        return '<li><time>' + fmtClock(leg.t0) + '</time><span>Walk ' + fmtMin(leg.t1 - leg.t0) + ' to '
-          + (leg.to ? esc(leg.to) : 'where you clicked') + '</span></li>';
+        walk += leg.t1 - leg.t0;
+        return '<li class="walk"><time>' + fmtClock(leg.t0) + '</time><span>Walk to ' + (leg.to ? esc(leg.to) : 'where you clicked')
+          + '<small>' + fmtDist(haversine(leg.a, leg.b) * WALK_DETOUR) + '</small></span><em>' + fmtMin(leg.t1 - leg.t0) + '</em></li>';
       }
       const route = net.routes[leg.r], dir = route.dirs[leg.di];
-      const wait = leg.t0 - leg.ready;
-      return '<li><time>' + fmtClock(leg.t0) + '</time><span>' + (wait >= 60 ? 'Wait ' + fmtMin(wait) + ', then ride ' : 'Ride ')
-        + '<b style="color:' + COLORS[route.class] + '">' + esc(route.id) + '</b> ' + esc(route.name) + ' for '
-        + fmtMin(leg.t1 - leg.t0) + ' to ' + esc(dir.stops[leg.i1].name) + '</span></li>';
+      const waited = leg.t0 - leg.ready, n = leg.i1 - leg.i0;
+      wait += waited;
+      ride += leg.t1 - leg.t0;
+      return '<li class="ride"><time>' + fmtClock(leg.t0) + '</time><span>' + badge(route) + ' ' + esc(route.name)
+        + '<small>' + (sameBus(leg, j) ? 'Same bus, after ' + fmtMin(waited) + ' at the terminus'
+          : (waited >= 30 ? 'Wait ' + fmtMin(waited) + ' at ' : 'Board at ') + esc(dir.stops[leg.i0].name)) + '</small>'
+        + '<small>Off at ' + esc(dir.stops[leg.i1].name) + ', ' + fmtClock(leg.t1) + ' · ' + n + (n === 1 ? ' stop' : ' stops') + '</small>'
+        + '</span><em>' + fmtMin(leg.t1 - leg.t0) + '</em></li>';
     });
-    const onFoot = plan.legs.every(leg => leg.type === 'walk');
-    rows.push('<li class="arrive"><time>' + fmtClock(plan.t1) + '</time><span>Arrive, ' + fmtMin(plan.t1 - plan.t0)
-      + ' after setting out' + (onFoot ? '. No bus gets there sooner.' : '') + '</span></li>');
+    rows.push('<li class="arrive"><time>' + fmtClock(plan.t1) + '</time><span>Arrive</span><em></em></li>');
+
+    $('trip-when').innerHTML = fmtClock(plan.t0) + ' → ' + fmtClock(plan.t1) + ' <span>' + fmtMin(total) + '</span>';
+    $('trip-buses').innerHTML = rides.length
+      ? buses.map(leg => badge(net.routes[leg.r])).join('<i>→</i>')
+        + '<span>' + (buses.length === 1 ? 'one bus' : buses.length + ' buses, ' + (buses.length - 1) + (buses.length === 2 ? ' change' : ' changes')) + '</span>'
+      : '<span>' + (plan.noBus && total > WALK_ALL_MAX ? 'No bus gets there from here at this hour, so they walk.' : 'On foot: no bus is quicker.') + '</span>';
     $('trip-steps').innerHTML = rows.join('');
-    $('trip-hint').hidden = true;
+    const parts = [['walk', 'Walking', walk], ['wait', 'Waiting', wait], ['ride', 'On the bus', ride]].filter(p => p[2] >= 30);
+    $('trip-split').innerHTML = parts.map(p => '<i class="' + p[0] + '" style="flex-grow:' + Math.round(p[2]) + '"></i>').join('');
+    $('trip-totals').innerHTML = parts.map(p => '<span class="' + p[0] + '">' + p[1] + ' <b>' + fmtMin(p[2]) + '</b></span>').join('');
+    $('trip-panel').hidden = false;
   }
 
   function renderRider() {
     if (!rider.plan) return;
     const at = riderAt(rider.plan, state.t);
     rider.marker.setLngLat(at.pos);
+    const legs = rider.plan.legs.length, leg = rider.plan.legs[at.step];
+    const status = at.step < 0 ? 'Setting out' : at.step >= legs ? 'Arrived'
+      : leg.type === 'walk' ? 'Walking' : state.t < leg.t0 ? 'Waiting for the ' + net.routes[leg.r].id : 'On the ' + net.routes[leg.r].id;
+    if ($('trip-status').textContent !== status) $('trip-status').textContent = status;
     if (at.step === rider.step) return;
     rider.step = at.step;
     [...$('trip-steps').children].forEach((li, i) => {
       li.classList.toggle('done', i < at.step);
       li.classList.toggle('now', i === at.step);
+      if (i === at.step) li.scrollIntoView({ block: 'nearest' });   // the panel scrolls on a phone
     });
   }
 
@@ -534,6 +592,7 @@
       render();
     });
     $('play').addEventListener('click', () => setPlaying(!state.playing));
+    $('trip-close').addEventListener('click', () => clearTrip());
     $('speed').addEventListener('change', e => { state.speed = +e.target.value; });
     $('time').addEventListener('input', e => { state.t = +e.target.value * 60; render(); });
   }

@@ -39,7 +39,6 @@
 
   <div id="trip">
     <p id="trip-hint">Drag the figure to a start, then click the map: they go there by bus, leaving at the time shown.</p>
-    <ol id="trip-steps" aria-live="polite"></ol>
   </div>
 
   <ul id="legend">
@@ -57,6 +56,16 @@
     Not an official City of Guelph product.
   </p>
 </section>
+
+<aside id="trip-panel" aria-label="The rider's trip" hidden>
+  <button type="button" id="trip-close" aria-label="Close the trip">×</button>
+  <p id="trip-status" aria-live="polite"></p>
+  <p id="trip-when"></p>
+  <p id="trip-buses"></p>
+  <ol id="trip-steps"></ol>
+  <div id="trip-split" aria-hidden="true"></div>
+  <p id="trip-totals"></p>
+</aside>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="app.js"></script>

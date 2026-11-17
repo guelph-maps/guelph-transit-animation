@@ -24,7 +24,9 @@ Live: https://guelph-maps.github.io/guelph-transit-animation/
 - Hovering a line lists the routes there and their current frequency.
 - A rider stands on the map. Drag the figure to a start, click anywhere, and they travel
   there by bus from the time shown: walking to a stop, waiting, riding the simulated bus,
-  changing if needed. The panel lists the steps with their times.
+  changing buses as often as it takes. A floating panel shows the trip: when they leave and
+  arrive, which buses they take, each step with its times, and how long they spend
+  walking, waiting and riding.
 
 ## Run it
 
@@ -59,15 +61,22 @@ average speed.
 
 The rider takes the same made-up timetable the bus dots follow, so during a ride the
 figure is on an actual simulated bus. The plan is the earliest arrival for leaving at the
-time shown (a RAPTOR search, up to four boardings), under these assumptions:
+time shown (a RAPTOR search, up to five boardings), under these assumptions:
 
 - **Walking is a straight line** at 4.8 km/h, with distances multiplied by 1.3 for the
-  streets not being straight. The rider can walk to any stop, and between stops up to
-  300 m apart when changing buses.
+  streets not being straight.
+- **The rider walks to the nearest stop**, or to one up to 400 m farther in a straight
+  line (the stop across the street, the other route round the corner), and the same from
+  the bus to where they are going. Between buses they walk up to 400 m.
+  Everything else is done by bus, with as many changes as it takes.
 - **A change needs 60 s** at the stop, and a boarding has to save 3 minutes to be worth
-  making. If no bus beats walking the whole way, the rider walks.
-- **No staying on through the terminus.** A bus's outbound and return runs are separate
-  trips to the rider.
+  making.
+- **Walking the whole way** happens when no bus gets there at that hour, when it takes
+  15 minutes or less and is no slower, or when the buses would take over one and a
+  half times as long.
+- **The terminus splits a ride in two.** A bus's outbound and return runs are separate
+  trips to the planner; a rider who stays with the bus through its layover is shown as
+  staying on the same bus.
 - The plan is made once, for the day type and time of the click. Changing the day or
   dragging the figure drops it; a trip still under way when the clock wraps at 2 am ends
   at its destination.
