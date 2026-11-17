@@ -67,7 +67,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
   position: absolute;
   top: 12px;
   right: 54px;
-  width: 300px;
+  width: 372px;
+  --bike-col: 80px;
   max-height: calc(100% - 60px);
   overflow: auto;
   padding: 12px 14px;
@@ -82,13 +83,17 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 #trip-status { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 #trip-when { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
 #trip-when span { margin-left: 6px; font-size: 14px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
-#trip-buses { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 4px 0 8px !important; }
+/* Two columns all the way down: the rider's trip, and the same trip by bicycle. */
+#trip-head, #trip-lines { display: grid; grid-template-columns: minmax(0, 1fr) var(--bike-col); }
+#trip-head { align-items: center; margin: 4px 0 8px; }
+#trip-buses { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 #trip-buses i { font-style: normal; color: var(--muted); }
 #trip-buses span { color: var(--muted); }
 #trip-buses .badge + span, #trip-buses .badge ~ span { margin-left: 4px; }
 .badge { display: inline-block; min-width: 26px; padding: 0 5px; border-radius: 4px; color: #fff; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
 
-#trip-steps { list-style: none; margin: 0; padding: 6px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+#trip-lines { position: relative; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+#trip-steps { list-style: none; margin: 0; padding: 6px 0; }
 #trip-steps li { display: flex; gap: 8px; padding: 4px 0 4px 6px; border-left: 3px solid transparent; }
 #trip-steps time { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); }
 #trip-steps span { flex: 1; min-width: 0; }
@@ -110,14 +115,36 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 
 .rider { width: 26px; height: 38px; cursor: grab; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.45)); }
 .rider:active { cursor: grabbing; }
-.rider svg { display: block; width: 100%; height: 100%; fill: var(--ink); stroke: #fff; stroke-width: 1.5; paint-order: stroke; }
-.bike { width: 30px; height: 20px; opacity: 0.6; pointer-events: none; }
-.bike svg, #trip-bike svg { display: block; width: 100%; height: 100%; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.bike svg { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff); }
-#trip-bike { display: flex; align-items: center; gap: 10px; margin-top: 8px !important; padding-top: 8px; border-top: 1px solid var(--rule); color: var(--muted); }
-#trip-bike svg { flex: none; width: 30px; height: 20px; opacity: 0.6; }
-#trip-bike b { color: var(--ink); font-variant-numeric: tabular-nums; }
-#trip-bike small { display: block; font-size: 12px; }
+.rider > svg { display: block; width: 100%; height: 100%; fill: var(--ink); stroke: #fff; stroke-width: 1.5; paint-order: stroke; }
+.bike { width: 30px; height: 20px; pointer-events: none; }
+.bike > svg, #trip-bike > svg { display: block; width: 100%; height: 100%; opacity: 0.6; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bike > svg { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff); }
+#trip-bike { display: flex; align-items: center; gap: 7px; padding-left: 8px; }
+#trip-bike > svg { flex: none; width: 27px; height: 18px; }
+#trip-bike b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* The bicycle's line. app.js places .line, .at and .end on the clock of the steps. */
+#trip-rail { position: relative; border-left: 1px solid var(--rule); }
+#trip-rail .line { position: absolute; left: 10px; width: 3px; border-radius: 2px; background: #7a8494; opacity: 0.75; }
+#trip-rail .at { position: absolute; left: 6px; top: -5.5px; z-index: 1; width: 11px; height: 11px; border-radius: 50%; background: var(--paper); border: 3px solid var(--ink); }
+#trip-rail .end { position: absolute; left: 0; right: 0; margin-top: -10px; padding-left: 23px; }
+#trip-rail .end::before { content: ""; position: absolute; left: 6px; top: 4.5px; width: 11px; height: 11px; border-radius: 50%; background: #7a8494; }
+#trip-rail .end b { display: block; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--muted); }
+#trip-rail .end small { display: block; font-size: 12px; color: var(--muted); }
+
+/* The medal waits, unseen but with its place kept, until its owner is there. */
+.award { display: inline-flex; align-items: center; gap: 5px; vertical-align: -5px; visibility: hidden; transform-origin: 8px 0; }
+.award svg { flex: none; width: 15px; height: 20px; }
+#trip-panel .award small { display: block; font-size: 11px; line-height: 1.15; font-weight: 600; color: var(--ink); }
+#trip-rail .award { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; margin-top: 5px; }
+#trip-panel.won .award { visibility: visible; animation: medal 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
+.medal { position: absolute; display: none; width: 17px; height: 23px; transform-origin: 50% 0; }
+.medal svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 0 1px #fff) drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.4)); }
+.rider .medal { top: -6px; right: -13px; }
+.bike .medal { top: -19px; right: -8px; }
+.medalled .medal { display: block; animation: medal 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes medal { from { transform: scale(0) rotate(-30deg); } }
+@media (prefers-reduced-motion: reduce) { .award, .medal { animation: none !important; } }
 .dest { width: 16px; height: 16px; border-radius: 50%; background: var(--ink); border: 3px solid #fff; box-shadow: 0 0 0 2px var(--ink); }
 
 #legend { list-style: none; margin: 0 0 6px; padding: 8px 0 0; border-top: 1px solid var(--rule); }
@@ -148,15 +175,12 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
     border-width: 1px 0 0;
     padding: 10px 16px 14px;
   }
-  #trip-panel { top: 8px; left: 8px; right: 48px; width: auto; max-height: 27%; padding: 8px 12px; }
+  /* The panel is short here, but the bicycle's time heads its column, above the fold. */
+  #trip-panel { top: 8px; left: 8px; right: 48px; width: auto; max-height: 27%; padding: 8px 12px; --bike-col: 80px; }
+  #trip-bike { gap: 5px; padding-left: 6px; }
+  #trip-bike > svg { width: 22px; height: 15px; }
   #trip-when { font-size: 18px; }
-  /* The panel is short here: the bicycle goes above the steps, not below the fold. */
-  #trip-panel { display: flex; flex-direction: column; }
-  #trip-panel > * { order: 2; flex: none; }
-  #trip-status, #trip-when, #trip-buses { order: 0; }
-  #trip-bike { order: 1; margin: 0 0 6px !important; padding: 0; border: 0; }
-  #trip-bike small { display: inline; margin-left: 6px; }
-  #trip-buses { margin-bottom: 4px !important; }
+  #trip-head { margin-bottom: 4px; }
   #clock-time { font-size: 26px; }
   h1 span { display: inline; }
 }

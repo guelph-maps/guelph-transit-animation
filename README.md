@@ -29,8 +29,12 @@ Live: https://guelph-maps.github.io/guelph-transit-animation/
   arrive, which buses they take, each step with its times, and how long they spend
   walking, waiting and riding.
 - A shadow bicycle sets out with the rider, from the same place to the same place at the
-  same moment, and the trip panel says how long it takes and how much sooner or later
-  it is there.
+  same moment. In the trip panel its line runs down beside the rider's steps, on their
+  clock: the steps are rows, not a scale, so each row's time is a mark and the bicycle
+  ends between the two rows it arrives between.
+- Whichever of the two is there first gets the fastest commuter's medal as it arrives,
+  in the panel and on the map. Less than 30 seconds apart is a dead heat, and nobody
+  gets it.
 
 ## Run it
 
@@ -212,6 +216,11 @@ Run in the browser console (`window.sim` exposes the simulation):
 - The page loads without console errors and all layers draw; a trip was watched with
   its walks on the streets and the bicycle beside it, on a desktop and a phone-sized
   window.
+- The medal and the bicycle's line were looked at on one trip the bus wins (the bicycle
+  ends just below the Arrive row) and one the bicycle wins (it ends between the rows
+  stamped 10:00 and 10:13, at 10:10). The medal goes when the clock is dragged back
+  before the arrival and when the day changes. A dead heat and a bicycle far behind the
+  bus were not looked at.
 
 ## Not done
 

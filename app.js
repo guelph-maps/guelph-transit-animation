@@ -27,9 +27,10 @@
   const TRANSFER_SLACK = 60;      // s needed at a stop before boarding the next bus
   const BOARD_PENALTY = 180;      // s a boarding must save to be worth making
   const MAX_BOARDINGS = 5;
+  const TIE = 30;                 // s: arrivals this close are a dead heat, and nobody gets the medal
 
   const state = { day: 'weekday', t: 7 * 3600, playing: true, speed: 300 };
-  const rider = { pos: null, plan: null, marker: null, bikeMarker: null, destMarker: null, step: null, draggedAt: 0 };
+  const rider = { pos: null, plan: null, marker: null, bikeMarker: null, destMarker: null, step: null, draggedAt: 0, rail: null, awarded: null };
   let net = null;
   let streets = null;
   let map = null;
@@ -400,6 +401,9 @@
     // by the streets.
     const line = walks.direct.line;
     plan.bike = { line, cum: measure(line), m: walks.direct.m, t1: t0 + walks.direct.m / BIKE_SPEED };
+    // Whoever is there first is the fastest commuter; within TIE seconds, nobody is.
+    const ahead = plan.t1 - plan.bike.t1;
+    plan.winner = Math.abs(ahead) < TIE ? null : ahead > 0 ? 'bike' : 'rider';
     return plan;
   }
 
@@ -675,6 +679,17 @@
   const BIKE = '<svg viewBox="0 0 34 22" aria-hidden="true"><circle cx="7" cy="15" r="5.5"/><circle cx="27" cy="15" r="5.5"/>'
     + '<path d="M7 15l5-9h10l5 9M12 6l5 9 5-9M10.5 3h4M22 6l-1-3.5h3"/></svg>';
 
+  // The fastest commuter's medal: two ribbon tails, a gold disc, and a pair of chevrons
+  // for speed. Styled inline, so the rules for the other glyphs leave it alone.
+  const MEDAL = '<svg viewBox="0 0 20 27" aria-hidden="true">'
+    + '<path d="M3.2 0h5.4l3.2 8.6-4.6 2.4z" style="fill:#1c2330;stroke:none"/>'
+    + '<path d="M16.8 0h-5.4L8.2 8.6l4.6 2.4z" style="fill:#3a6ea5;stroke:none"/>'
+    + '<circle cx="10" cy="17.5" r="8.4" style="fill:#f4b929;stroke:#9a6a00;stroke-width:1.2"/>'
+    + '<circle cx="10" cy="17.5" r="5.9" style="fill:none;stroke:#fff;stroke-width:0.9;stroke-opacity:0.75"/>'
+    + '<path d="M6.6 14.6l2.9 2.9-2.9 2.9M10.6 14.6l2.9 2.9-2.9 2.9" style="fill:none;stroke:#1c2330;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"/></svg>';
+  const AWARD = '<span class="award" title="Fastest commuter">' + MEDAL + '<small>Fastest commuter</small></span>';
+  const PIN = '<span class="medal" title="Fastest commuter">' + MEDAL + '</span>';
+
   function esc(s) {
     return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
@@ -687,7 +702,7 @@
     const el = document.createElement('div');
     el.className = 'rider';
     el.title = 'Drag me, then click the map';
-    el.innerHTML = FIGURE;
+    el.innerHTML = FIGURE + PIN;
     const central = net.ustops.find(s => /Guelph Central Station/.test(s.name));
     rider.pos = central ? central.pos : map.getCenter().toArray();
     rider.marker = new maplibregl.Marker({ element: el, anchor: 'bottom', draggable: true }).setLngLat(rider.pos).addTo(map);
@@ -700,7 +715,7 @@
     const bike = document.createElement('div');
     bike.className = 'bike';
     bike.title = 'The same trip by bicycle';
-    bike.innerHTML = BIKE;
+    bike.innerHTML = BIKE + PIN;
     rider.bikeMarker = new maplibregl.Marker({ element: bike, anchor: 'bottom' });
 
     const dest = document.createElement('div');
@@ -720,6 +735,8 @@
     if (rider.plan) rider.pos = riderAt(rider.plan, state.t).pos;
     rider.plan = null;
     rider.step = null;
+    rider.rail = null;
+    setAward(null);
     rider.destMarker.remove();
     rider.bikeMarker.remove();
     rider.marker.setLngLat(rider.pos);
@@ -799,7 +816,7 @@
         + '<small>Off at ' + esc(dir.stops[leg.i1].name) + ', ' + fmtClock(leg.t1) + ' · ' + n + (n === 1 ? ' stop' : ' stops') + '</small>'
         + '</span><em>' + fmtMin(leg.t1 - leg.t0) + '</em></li>';
     });
-    rows.push('<li class="arrive"><time>' + fmtClock(plan.t1) + '</time><span>Arrive</span><em></em></li>');
+    rows.push('<li class="arrive"><time>' + fmtClock(plan.t1) + '</time><span>Arrive' + (plan.winner === 'rider' ? ' ' + AWARD : '') + '</span><em></em></li>');
 
     $('trip-when').innerHTML = fmtClock(plan.t0) + ' → ' + fmtClock(plan.t1) + ' <span>' + fmtMin(total) + '</span>';
     $('trip-buses').innerHTML = rides.length
@@ -810,10 +827,50 @@
     const parts = [['walk', 'Walking', walk], ['wait', 'Waiting', wait], ['ride', 'On the bus', ride]].filter(p => p[2] >= 30);
     $('trip-split').innerHTML = parts.map(p => '<i class="' + p[0] + '" style="flex-grow:' + Math.round(p[2]) + '"></i>').join('');
     $('trip-totals').innerHTML = parts.map(p => '<span class="' + p[0] + '">' + p[1] + ' <b>' + fmtMin(p[2]) + '</b></span>').join('');
-    const bike = plan.bike, ahead = plan.t1 - bike.t1;
-    $('trip-bike').innerHTML = BIKE + '<span>By bike <b>' + fmtMin(bike.t1 - plan.t0) + '</b>, there at ' + fmtClock(bike.t1)
-      + '<small>' + fmtDist(bike.m) + ' · ' + (Math.abs(ahead) < 30 ? 'the same as this trip' : fmtMin(Math.abs(ahead)) + (ahead > 0 ? ' sooner' : ' later')) + '</small></span>';
+    // The bicycle's own timeline, beside the steps and on their clock: one line from
+    // setting out to arriving, with a dot that rides down it.
+    const bike = plan.bike;
+    $('trip-bike').innerHTML = BIKE + '<b>' + fmtMin(bike.t1 - plan.t0) + '</b>';
+    $('trip-bike').title = 'The same trip by bicycle';
+    $('trip-rail').innerHTML = '<i class="line"></i><i class="at"></i><div class="end"><b>' + fmtClock(bike.t1) + '</b><small>'
+      + fmtDist(bike.m) + '</small>' + (plan.winner === 'bike' ? AWARD : '') + '</div>';
+    $('trip-rail').setAttribute('aria-label', 'By bicycle: ' + fmtMin(bike.t1 - plan.t0) + ', there at ' + fmtClock(bike.t1)
+      + (plan.winner === 'bike' ? ', the fastest commuter' : ''));
     $('trip-panel').hidden = false;
+    layoutRail();
+  }
+
+  // Put the bicycle's line on the clock of the steps beside it. The steps are rows, not
+  // a scale, so the time stamped on each row is a mark and times between two rows fall
+  // between them: a bicycle that is there at 07:13 ends between the rows stamped 07:10
+  // and 07:15. One that is there after the rider runs on below the last row.
+  function layoutRail() {
+    const plan = rider.plan, rail = $('trip-rail');
+    if (!plan || !rail.firstChild) return;
+    const marks = [...$('trip-steps').children].map((li, i) => ({ t: i < plan.legs.length ? plan.legs[i].t0 : plan.t1, y: li.offsetTop + 14 }));
+    const first = marks[0], last = marks[marks.length - 1];
+    const pace = last.t > first.t ? (last.y - first.y) / (last.t - first.t) : 0;   // px a second, past the last row
+    const yAt = t => {
+      if (t <= first.t) return first.y;
+      if (t >= last.t) return last.y + Math.min(90, (t - last.t) * pace);
+      const i = marks.findIndex(m => m.t > t), a = marks[i - 1], b = marks[i];
+      return a.y + (t - a.t) / (b.t - a.t) * (b.y - a.y);
+    };
+    const [line, at, end] = rail.children, yEnd = yAt(plan.bike.t1);
+    line.style.top = first.y + 'px';
+    line.style.height = Math.max(0, yEnd - first.y) + 'px';
+    end.style.top = yEnd + 'px';
+    rail.style.minHeight = Math.ceil(yEnd + end.offsetHeight) + 'px';
+    rider.rail = { at, yAt };
+    at.style.transform = 'translateY(' + yAt(Math.min(state.t, plan.bike.t1)) + 'px)';
+  }
+
+  // Hang the medal on whoever has it (null: nobody yet), in the panel and on the map.
+  function setAward(who) {
+    rider.awarded = who;
+    $('trip-panel').classList.toggle('won', !!who);
+    rider.marker.getElement().classList.toggle('medalled', who === 'rider');
+    rider.bikeMarker.getElement().classList.toggle('medalled', who === 'bike');
   }
 
   function renderRider() {
@@ -821,6 +878,10 @@
     const at = riderAt(rider.plan, state.t), bike = rider.plan.bike;
     rider.marker.setLngLat(at.pos);
     rider.bikeMarker.setLngLat(alongLine(bike.line, bike.cum, (state.t - rider.plan.t0) / (bike.t1 - rider.plan.t0)));
+    if (rider.rail) rider.rail.at.style.transform = 'translateY(' + rider.rail.yAt(Math.min(state.t, bike.t1)) + 'px)';
+    // The medal is won on arriving, and lost again if the clock is dragged back.
+    const awarded = rider.plan.winner && state.t >= Math.min(rider.plan.t1, bike.t1) ? rider.plan.winner : null;
+    if (awarded !== rider.awarded) setAward(awarded);
     const legs = rider.plan.legs.length, leg = rider.plan.legs[at.step];
     const status = at.step < 0 ? 'Setting out' : at.step >= legs ? 'Arrived'
       : leg.type === 'walk' ? 'Walking' : state.t < leg.t0 ? 'Waiting for the ' + net.routes[leg.r].id : 'On the ' + net.routes[leg.r].id;
@@ -832,6 +893,7 @@
       li.classList.toggle('now', i === at.step);
       if (i === at.step) li.scrollIntoView({ block: 'nearest' });   // the panel scrolls on a phone
     });
+    layoutRail();   // the row now in bold may have wrapped, and moved the rows below it
   }
 
   function setPlaying(on) {
@@ -853,6 +915,8 @@
     $('trip-close').addEventListener('click', () => clearTrip());
     $('speed').addEventListener('change', e => { state.speed = +e.target.value; });
     $('time').addEventListener('input', e => { state.t = +e.target.value * 60; render(); });
+    // The rows move whenever the steps are laid out again: a new width, a font arriving.
+    new ResizeObserver(layoutRail).observe($('trip-steps'));
   }
 
   function bindHover() {
