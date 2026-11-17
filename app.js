@@ -41,7 +41,7 @@
 
   // A phone: style.css puts everything in one sheet, under the map or (on its side)
   // beside it. The same query as there.
-  const compact = window.matchMedia('(max-width: 640px), (max-height: 500px) and (max-width: 1000px)');
+  const compact = window.matchMedia('(max-width: 820px), (max-height: 500px) and (max-width: 1000px)');
   let sheetH = -1;
 
   // ---------- geometry ----------

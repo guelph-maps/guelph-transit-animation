@@ -292,6 +292,14 @@ Run in the browser console (`window.sim` exposes the simulation):
   15 km/h, then 13 min at 13 km/h), and a 120 m trip both walk (4.8 km/h each, the
   shadow on foot). The switch while still disabled and a trip the bus wins were not.
 
+- The phone's sheet (one sheet under the map, the race as two lanes on it) was looked at
+  in windows of 360×640, 375×667, 812×375 and 768×1024, and the desktop at 1024×768 for being
+  unchanged: no trip, a trip the bicycle wins with parking on and off, one the bus wins
+  (26 min against 27), the steps open, and the legend and notes open during a trip. The
+  map keeps 63% of the height during a race at 375×667. All of it with the clock set by
+  hand and a mouse: a race playing by itself, a finger's tap and a finger dragging the
+  figure were not tried, and neither was a real phone or tablet.
+
 ## Not done
 
 - A sensible choice of rack: the shadow takes the nearest one at each end, however far
