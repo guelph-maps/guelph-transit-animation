@@ -269,20 +269,19 @@ Run in the browser console (`window.sim` exposes the simulation):
 - Peak buses out: 84 weekday, 68 Saturday, 67 Sunday. Nothing is out at 4:50 am.
 - Every built line was measured against the line Remix sends: nowhere more than 5 m
   apart. Route 82 through the Arboretum was looked at beside the Remix map.
-- After the lines changed, 300 random trips over the three day types: in every ride leg
-  the figure is within a millimetre of a simulated bus of that route and direction, and
-  the rider is at every stop before their bus. The figures below are from the 600 trips
-  on the routed lines and were not rerun.
+- The trip figures below were measured again on 19 November, on the city's lines, with
+  new random trips (a point within about 300 m of a random stop, leaving between 6 am and
+  9 pm).
 - 600 random trips over the three day types, walking on the streets: in every ride leg
   the figure is within a millimetre of a simulated bus of that route and direction, the
   rider is at every stop before their bus, every walk's line is as long as its time
   says, and no weekday-only route is used on a weekend. At 3 am the plan is a walk.
-- In 42 of those 600 the buses are slower than walking the whole way would be (by 3
-  minutes at the median, 14 at most). That is the rule above: a walk of over 15 minutes
-  is only chosen when the buses would take one and a half times as long.
-- The bicycle is there first in 583 of the 600.
-- The same 600 trips on the version before the streets (straight lines times 1.3)
-  gave 33 such trips, so the streets did not bring them in.
+- In 36 of those 600 the buses are slower than walking the whole way would be (by 4
+  minutes at the median, 29 at most). That is the rule above: a walk of over 15 minutes
+  is only chosen when the buses would take one and a half times as long. On the routed
+  lines it was 42, by 3 at the median and 14 at most.
+- The bicycle is there first in 577 of the 600, and 7 are a tie (583 of 600 on the
+  routed lines, before there were ties).
 - The page loads without console errors and all layers draw; a trip was watched with
   its walks on the streets and the bicycle beside it, on a desktop and a phone-sized
   window.
@@ -297,7 +296,10 @@ Run in the browser console (`window.sim` exposes the simulation):
   walk the whole way; the legs join end to start and to the two doors, every leg's line
   is as long as its time says, and the shadow never jumps. Parking adds 10 minutes to
   the bicycle's trip at the median (1 at the least, 34 at the most), and the bicycle
-  is there first in 210 of the 300, against 288 with the switch off.
+  is there first in 210 of the 300, against 288 with the switch off. Again on the
+  city's lines, with new trips: 289 walk, ride and walk and 11 walk; parking adds 10
+  minutes at the median (under 1 at the least, 43 at the most); the bicycle is first
+  in 199 with the switch on and 291 with it off.
 - Looked at with the switch on: a trip across the city on a desktop and a phone-sized
   window, the switch thrown off and on again during it, a trip of 140 m with one rack
   nearest both ends (the shadow walks), and one of 430 m where the nearest rack is the
@@ -320,7 +322,10 @@ Run in the browser console (`window.sim` exposes the simulation):
   each from half an hour before setting out until the rider gets off): whenever it is
   out it is within a millimetre of a simulated bus of its route (3,500 moments on the
   rider's direction, 816 on the outbound run before it, 343 laying over), and 1,761
-  times it was still waiting at its terminus.
+  times it was still waiting at its terminus. Again on the city's lines, 12 moments per
+  trip rather than per ride (581 rides): 1,480 moments on the rider's direction, 599 on
+  the outbound run, 162 laying over and 1,203 waiting at the terminus, and never off a
+  simulated bus.
 - Looked at, the clock set by hand: a weekday trip with a change (the 8, then the 6),
   with the white ring at the terminus before the 8 leaves, the marked 6 laying over
   while the rider walks to it, the mark gone after the last ride, and the speeds going
@@ -331,7 +336,7 @@ Run in the browser console (`window.sim` exposes the simulation):
   itself and the marked bus at the lowest zooms were not looked at.
 
 - The tie: of 300 random weekday trips between stops, parking on, 38 end within a
-  minute of each other. One (63 min against 62, 15 s apart) was looked at on a desktop
+  minute of each other (34 on the city's lines, with new trips). One (63 min against 62, 15 s apart) was looked at on a desktop
   and at 375×667: no handshake between the two arrivals, the handshake once both are
   there, gone again when the clock is dragged back, and no medal anywhere. The one
   handshake was seen between the two figures on the map (the shadow on foot), under
